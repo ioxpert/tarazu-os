@@ -44,7 +44,7 @@ class OrgService {
 			jdbc.sql("""
 					INSERT INTO business (id, tenant_id, name, gst_mode, gstin, state_code)
 					VALUES (:id, :tenant, :name, :mode, :gstin, :state)
-					ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, gst_mode = EXCLUDED.gst_mode,
+					ON CONFLICT (tenant_id, id) DO UPDATE SET name = EXCLUDED.name, gst_mode = EXCLUDED.gst_mode,
 					       gstin = EXCLUDED.gstin, state_code = EXCLUDED.state_code
 					""").param("id", id).param("tenant", tenant).param("name", name).param("mode", gstMode)
 					.param("gstin", gstin).param("state", stateCode).update();
@@ -67,7 +67,7 @@ class OrgService {
 		try {
 			jdbc.sql("""
 					INSERT INTO store (id, tenant_id, business_id, name) VALUES (:id, :tenant, :business, :name)
-					ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name
+					ON CONFLICT (tenant_id, id) DO UPDATE SET name = EXCLUDED.name
 					WHERE store.business_id = EXCLUDED.business_id
 					""").param("id", id).param("tenant", tenant).param("business", businessId).param("name", name)
 					.update();

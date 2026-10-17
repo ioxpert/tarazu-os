@@ -9,7 +9,7 @@
 -- ---------- catalogue ----------
 
 CREATE TABLE product (
-    id          uuid PRIMARY KEY,
+    id          uuid        NOT NULL,
     tenant_id   uuid        NOT NULL REFERENCES tenant (id),
     name        text        NOT NULL,
     barcode     text,
@@ -20,14 +20,14 @@ CREATE TABLE product (
     -- {"name": "<hlc>", ...}: the clock of the write that last set each field
     field_clock jsonb       NOT NULL DEFAULT '{}',
     created_at  timestamptz NOT NULL DEFAULT now(),
-    updated_at  timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (tenant_id, id)
+    updated_at  timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE product ADD PRIMARY KEY (tenant_id, id);
 CREATE INDEX product_barcode_idx ON product (tenant_id, barcode) WHERE barcode IS NOT NULL;
 SELECT tarazu_enable_tenant_rls('product');
 
 CREATE TABLE price_version (
-    id             uuid PRIMARY KEY,
+    id             uuid        NOT NULL,
     tenant_id      uuid        NOT NULL REFERENCES tenant (id),
     product_id     uuid        NOT NULL,
     price_type     text        NOT NULL CHECK (price_type IN ('mrp', 'retail', 'wholesale', 'purchase')),
@@ -38,6 +38,7 @@ CREATE TABLE price_version (
     created_at     timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (tenant_id, product_id) REFERENCES product (tenant_id, id)
 );
+ALTER TABLE price_version ADD PRIMARY KEY (tenant_id, id);
 CREATE INDEX price_version_lookup_idx ON price_version
     (tenant_id, product_id, price_type, effective_from DESC, hlc DESC);
 SELECT tarazu_enable_tenant_rls('price_version');
@@ -54,7 +55,7 @@ AS $$
 $$;
 
 CREATE TABLE party (
-    id              uuid PRIMARY KEY,
+    id              uuid        NOT NULL,
     tenant_id       uuid        NOT NULL REFERENCES tenant (id),
     name            text        NOT NULL,
     party_type      text        NOT NULL DEFAULT 'customer' CHECK (party_type IN ('customer', 'supplier', 'both')),
@@ -65,10 +66,10 @@ CREATE TABLE party (
     merged_into     uuid,
     field_clock     jsonb       NOT NULL DEFAULT '{}',
     created_at      timestamptz NOT NULL DEFAULT now(),
-    updated_at      timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (tenant_id, id),
-    FOREIGN KEY (tenant_id, merged_into) REFERENCES party (tenant_id, id)
+    updated_at      timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE party ADD PRIMARY KEY (tenant_id, id);
+ALTER TABLE party ADD FOREIGN KEY (tenant_id, merged_into) REFERENCES party (tenant_id, id);
 CREATE INDEX party_phone_idx ON party (tenant_id, phone) WHERE phone IS NOT NULL;
 CREATE INDEX party_gstin_idx ON party (tenant_id, gstin) WHERE gstin IS NOT NULL;
 SELECT tarazu_enable_tenant_rls('party');
@@ -76,7 +77,7 @@ SELECT tarazu_enable_tenant_rls('party');
 -- A merge is a recorded decision with provenance. applied=false means it lost a race with another
 -- merge and was flagged for review instead of being applied.
 CREATE TABLE party_merge (
-    id               uuid PRIMARY KEY,
+    id               uuid        NOT NULL,
     tenant_id        uuid        NOT NULL REFERENCES tenant (id),
     source_party_id  uuid        NOT NULL,
     target_party_id  uuid        NOT NULL,
@@ -89,13 +90,14 @@ CREATE TABLE party_merge (
     FOREIGN KEY (tenant_id, source_party_id) REFERENCES party (tenant_id, id),
     FOREIGN KEY (tenant_id, target_party_id) REFERENCES party (tenant_id, id)
 );
+ALTER TABLE party_merge ADD PRIMARY KEY (tenant_id, id);
 SELECT tarazu_enable_tenant_rls('party_merge');
 SELECT tarazu_make_append_only('party_merge');
 
 -- ---------- inventory ----------
 
 CREATE TABLE stock_movement (
-    id           uuid PRIMARY KEY,
+    id           uuid        NOT NULL,
     tenant_id    uuid        NOT NULL REFERENCES tenant (id),
     store_id     uuid        NOT NULL,
     product_id   uuid        NOT NULL,
@@ -113,6 +115,7 @@ CREATE TABLE stock_movement (
     FOREIGN KEY (tenant_id, product_id) REFERENCES product (tenant_id, id),
     FOREIGN KEY (tenant_id, device_id)  REFERENCES device (tenant_id, id)
 );
+ALTER TABLE stock_movement ADD PRIMARY KEY (tenant_id, id);
 CREATE INDEX stock_movement_product_idx ON stock_movement (tenant_id, store_id, product_id, occurred_at);
 SELECT tarazu_enable_tenant_rls('stock_movement');
 SELECT tarazu_make_append_only('stock_movement');
@@ -152,7 +155,7 @@ CREATE TRIGGER stock_movement_projection AFTER INSERT ON stock_movement
 -- ---------- billing ----------
 
 CREATE TABLE invoice (
-    id            uuid PRIMARY KEY,
+    id            uuid        NOT NULL,
     tenant_id     uuid        NOT NULL REFERENCES tenant (id),
     store_id      uuid        NOT NULL,
     device_id     uuid        NOT NULL,
@@ -171,12 +174,12 @@ CREATE TABLE invoice (
     hlc           text        NOT NULL,
     operation_id  uuid        NOT NULL,
     created_at    timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (tenant_id, id),
     UNIQUE (tenant_id, series, number),
     FOREIGN KEY (tenant_id, store_id)  REFERENCES store (tenant_id, id),
     FOREIGN KEY (tenant_id, device_id) REFERENCES device (tenant_id, id),
     FOREIGN KEY (tenant_id, party_id)  REFERENCES party (tenant_id, id)
 );
+ALTER TABLE invoice ADD PRIMARY KEY (tenant_id, id);
 CREATE INDEX invoice_date_idx ON invoice (tenant_id, store_id, invoice_date);
 SELECT tarazu_enable_tenant_rls('invoice');
 SELECT tarazu_make_append_only('invoice');
@@ -202,7 +205,7 @@ SELECT tarazu_make_append_only('invoice_line');
 
 -- Returns and corrections: a credit note references the invoice, it never edits it.
 CREATE TABLE credit_note (
-    id           uuid PRIMARY KEY,
+    id           uuid        NOT NULL,
     tenant_id    uuid        NOT NULL REFERENCES tenant (id),
     store_id     uuid        NOT NULL,
     device_id    uuid        NOT NULL,
@@ -223,11 +226,12 @@ CREATE TABLE credit_note (
     FOREIGN KEY (tenant_id, invoice_id) REFERENCES invoice (tenant_id, id),
     FOREIGN KEY (tenant_id, party_id)   REFERENCES party (tenant_id, id)
 );
+ALTER TABLE credit_note ADD PRIMARY KEY (tenant_id, id);
 SELECT tarazu_enable_tenant_rls('credit_note');
 SELECT tarazu_make_append_only('credit_note');
 
 CREATE TABLE purchase_receipt (
-    id            uuid PRIMARY KEY,
+    id            uuid        NOT NULL,
     tenant_id     uuid        NOT NULL REFERENCES tenant (id),
     store_id      uuid        NOT NULL,
     device_id     uuid        NOT NULL,
@@ -246,11 +250,12 @@ CREATE TABLE purchase_receipt (
     FOREIGN KEY (tenant_id, device_id)   REFERENCES device (tenant_id, id),
     FOREIGN KEY (tenant_id, supplier_id) REFERENCES party (tenant_id, id)
 );
+ALTER TABLE purchase_receipt ADD PRIMARY KEY (tenant_id, id);
 SELECT tarazu_enable_tenant_rls('purchase_receipt');
 SELECT tarazu_make_append_only('purchase_receipt');
 
 CREATE TABLE sales_order (
-    id           uuid PRIMARY KEY,
+    id           uuid        NOT NULL,
     tenant_id    uuid        NOT NULL REFERENCES tenant (id),
     store_id     uuid        NOT NULL,
     party_id     uuid,
@@ -258,16 +263,16 @@ CREATE TABLE sales_order (
         ('draft', 'confirmed', 'packed', 'dispatched', 'delivered', 'cancelled', 'returned')),
     created_at   timestamptz NOT NULL DEFAULT now(),
     updated_at   timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (tenant_id, id),
     FOREIGN KEY (tenant_id, store_id) REFERENCES store (tenant_id, id),
     FOREIGN KEY (tenant_id, party_id) REFERENCES party (tenant_id, id)
 );
+ALTER TABLE sales_order ADD PRIMARY KEY (tenant_id, id);
 SELECT tarazu_enable_tenant_rls('sales_order');
 
 -- Append-only history. applied=false is a transition that was not legal from the state the server
 -- had when it arrived: recorded, flagged, not applied.
 CREATE TABLE order_transition (
-    id           uuid PRIMARY KEY,
+    id           uuid        NOT NULL,
     tenant_id    uuid        NOT NULL REFERENCES tenant (id),
     order_id     uuid        NOT NULL,
     from_state   text        NOT NULL,
@@ -281,6 +286,7 @@ CREATE TABLE order_transition (
     FOREIGN KEY (tenant_id, order_id)  REFERENCES sales_order (tenant_id, id),
     FOREIGN KEY (tenant_id, device_id) REFERENCES device (tenant_id, id)
 );
+ALTER TABLE order_transition ADD PRIMARY KEY (tenant_id, id);
 CREATE INDEX order_transition_order_idx ON order_transition (tenant_id, order_id, created_at);
 SELECT tarazu_enable_tenant_rls('order_transition');
 SELECT tarazu_make_append_only('order_transition');
@@ -288,7 +294,7 @@ SELECT tarazu_make_append_only('order_transition');
 -- ---------- ledger ----------
 
 CREATE TABLE payment (
-    id           uuid PRIMARY KEY,
+    id           uuid        NOT NULL,
     tenant_id    uuid        NOT NULL REFERENCES tenant (id),
     store_id     uuid        NOT NULL,
     party_id     uuid,
@@ -307,13 +313,14 @@ CREATE TABLE payment (
     FOREIGN KEY (tenant_id, invoice_id) REFERENCES invoice (tenant_id, id),
     FOREIGN KEY (tenant_id, device_id)  REFERENCES device (tenant_id, id)
 );
+ALTER TABLE payment ADD PRIMARY KEY (tenant_id, id);
 CREATE INDEX payment_party_idx ON payment (tenant_id, party_id) WHERE party_id IS NOT NULL;
 SELECT tarazu_enable_tenant_rls('payment');
 SELECT tarazu_make_append_only('payment');
 
 -- Khata (credit book). debit = party owes the merchant more, credit = party paid or was credited.
 CREATE TABLE khata_entry (
-    id           uuid PRIMARY KEY,
+    id           uuid        NOT NULL,
     tenant_id    uuid        NOT NULL REFERENCES tenant (id),
     store_id     uuid        NOT NULL,
     party_id     uuid        NOT NULL,
@@ -331,6 +338,7 @@ CREATE TABLE khata_entry (
     FOREIGN KEY (tenant_id, party_id)  REFERENCES party (tenant_id, id),
     FOREIGN KEY (tenant_id, device_id) REFERENCES device (tenant_id, id)
 );
+ALTER TABLE khata_entry ADD PRIMARY KEY (tenant_id, id);
 CREATE INDEX khata_entry_party_idx ON khata_entry (tenant_id, party_id, occurred_at);
 SELECT tarazu_enable_tenant_rls('khata_entry');
 SELECT tarazu_make_append_only('khata_entry');

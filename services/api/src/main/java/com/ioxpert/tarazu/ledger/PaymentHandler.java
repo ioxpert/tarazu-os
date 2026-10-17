@@ -63,7 +63,7 @@ class PaymentHandler implements EntityOperationHandler {
 				INSERT INTO payment (id, tenant_id, store_id, party_id, invoice_id, direction, mode, amount_paise, reference,
 				                     device_id, hlc, operation_id, occurred_at)
 				VALUES (:id, :tenant, :store, :party, :invoice, :direction, :mode, :amount, :ref, :device, :hlc, :op, :at)
-				ON CONFLICT (id) DO NOTHING
+				ON CONFLICT (tenant_id, id) DO NOTHING
 				""").param("id", op.entityId()).param("tenant", op.tenantId()).param("store", op.storeId())
 				.param("party", party).param("invoice", invoice).param("direction", direction).param("mode", mode)
 				.param("amount", amount).param("ref", p.optText("reference").orElse(null))

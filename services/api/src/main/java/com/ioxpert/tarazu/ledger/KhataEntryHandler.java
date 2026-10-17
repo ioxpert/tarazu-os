@@ -54,7 +54,7 @@ class KhataEntryHandler implements EntityOperationHandler {
 				INSERT INTO khata_entry (id, tenant_id, store_id, party_id, direction, amount_paise, ref_type, ref_id, note,
 				                         device_id, hlc, operation_id, occurred_at)
 				VALUES (:id, :tenant, :store, :party, :direction, :amount, :refType, :refId, :note, :device, :hlc, :op, :at)
-				ON CONFLICT (id) DO NOTHING
+				ON CONFLICT (tenant_id, id) DO NOTHING
 				""").param("id", op.entityId()).param("tenant", op.tenantId()).param("store", op.storeId())
 				.param("party", party).param("direction", direction).param("amount", amount)
 				.param("refType", p.optText("refType").orElse(null)).param("refId", p.optUuid("refId").orElse(null))

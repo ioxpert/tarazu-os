@@ -47,7 +47,7 @@ class OrderHandler implements EntityOperationHandler {
 		}
 		jdbc.sql("""
 				INSERT INTO sales_order (id, tenant_id, store_id, party_id, state) VALUES (:id, :tenant, :store, :party, :state)
-				ON CONFLICT (id) DO NOTHING
+				ON CONFLICT (tenant_id, id) DO NOTHING
 				""").param("id", op.entityId()).param("tenant", op.tenantId()).param("store", op.storeId())
 				.param("party", party).param("state", state).update();
 		return HandlerResult.applied();

@@ -44,8 +44,11 @@ export function buildSale(ctx: SaleContext): WriteItem[] {
         invoiceDate: date,
         partyId: ctx.partyId,
         subtotalPaise: total,
+        discountPaise: 0,
+        taxPaise: 0,
+        roundOffPaise: 0,
         totalPaise: total,
-        lines: [{ productId: ctx.productId, qtyMilli: 1000, unitPricePaise: total, lineTotalPaise: total }],
+        lines: [{ productId: ctx.productId, qtyMilli: 1000, unitPricePaise: total, discountPaise: 0, taxRateBp: 0, taxPaise: 0, lineTotalPaise: total }],
       },
     }, [
       {

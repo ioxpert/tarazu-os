@@ -165,9 +165,11 @@ class SyncUploadIT extends ApiIT {
 		var opA = new Ops(a).product(UUID.randomUUID(), "A");
 		var opB = new java.util.LinkedHashMap<>(new Ops(b).product(UUID.randomUUID(), "B"));
 		opB.put("operationId", opA.get("operationId"));
+		opB.put("entityId", opA.get("entityId"));
 		assertThat(statusOf(upload(a, List.of(opA)), 0)).isEqualTo("applied");
-		assertThat(statusOf(upload(b, List.of(opB)), 0)).as("another tenant's id must not swallow this op").isEqualTo("applied");
-		assertThat(count(b, "SELECT count(*) FROM product")).isEqualTo(1);
+		assertThat(statusOf(upload(b, List.of(opB)), 0)).as("another tenant's ids must not swallow or probe this op").isEqualTo("applied");
+		assertThat(count(b, "SELECT count(*) FROM product WHERE name = 'B'")).isEqualTo(1);
+		assertThat(count(a, "SELECT count(*) FROM product WHERE name = 'A'")).isEqualTo(1);
 	}
 
 	@Test

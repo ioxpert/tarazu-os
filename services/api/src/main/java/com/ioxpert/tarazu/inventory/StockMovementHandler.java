@@ -66,7 +66,7 @@ class StockMovementHandler implements EntityOperationHandler {
 				INSERT INTO stock_movement (id, tenant_id, store_id, product_id, qty_milli, reason, ref_type, ref_id,
 				                            device_id, hlc, operation_id, occurred_at)
 				VALUES (:id, :tenant, :store, :product, :qty, :reason, :refType, :refId, :device, :hlc, :op, :at)
-				ON CONFLICT (id) DO NOTHING
+				ON CONFLICT (tenant_id, id) DO NOTHING
 				""").param("id", op.entityId()).param("tenant", op.tenantId()).param("store", op.storeId())
 				.param("product", productId).param("qty", qty).param("reason", reason)
 				.param("refType", p.optText("refType").orElse(null)).param("refId", p.optUuid("refId").orElse(null))

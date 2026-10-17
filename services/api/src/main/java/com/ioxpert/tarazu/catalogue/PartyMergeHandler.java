@@ -77,7 +77,7 @@ class PartyMergeHandler implements EntityOperationHandler {
 		int inserted = jdbc.sql("""
 				INSERT INTO party_merge (id, tenant_id, source_party_id, target_party_id, applied, reason, provenance, operation_id)
 				VALUES (:id, :tenant, :source, :target, :applied, :reason, CAST(:prov AS jsonb), :op)
-				ON CONFLICT (id) DO NOTHING
+				ON CONFLICT (tenant_id, id) DO NOTHING
 				""").param("id", op.entityId()).param("tenant", op.tenantId()).param("source", source)
 				.param("target", target).param("applied", applied).param("reason", op.payload().optText("reason").orElse(null))
 				.param("prov", json.writeValueAsString(provenance)).param("op", op.operationId()).update();

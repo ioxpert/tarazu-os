@@ -54,7 +54,7 @@ class PriceHandler implements EntityOperationHandler {
 		ctx.require("product", productId);
 		jdbc.sql("""
 				INSERT INTO price_version (id, tenant_id, product_id, price_type, amount_paise, effective_from, hlc, operation_id)
-				VALUES (:id, :tenant, :product, :type, :amount, :from, :hlc, :op) ON CONFLICT (id) DO NOTHING
+				VALUES (:id, :tenant, :product, :type, :amount, :from, :hlc, :op) ON CONFLICT (tenant_id, id) DO NOTHING
 				""").param("id", op.entityId()).param("tenant", op.tenantId()).param("product", productId)
 				.param("type", type).param("amount", amount)
 				.param("from", java.sql.Timestamp.from(p.instant("effectiveFrom"))).param("hlc", op.hlc().raw())

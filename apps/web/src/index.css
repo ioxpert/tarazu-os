@@ -6,3 +6,9 @@ h1 { margin: 0 0 .25rem; }
 .status { list-style: none; padding: 0; display: grid; gap: .5rem; }
 .status li { padding: .75rem 1rem; border-radius: .5rem; border: 1px solid #8884; border-left: 6px solid #d97706; }
 .status li[data-ok='true'] { border-left-color: #0f766e; }
+
+.sync-badge { display: inline-block; padding: 0.1rem 0.6rem; border-radius: 999px; font-size: 0.9rem; border: 1px solid currentColor; }
+.sync-badge[data-state='backed_up'] { color: #166534; }
+.sync-badge[data-state='saved_on_device'] { color: #92400e; }
+.sync-badge[data-state='action_required'] { color: #b91c1c; font-weight: 600; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

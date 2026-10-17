@@ -51,7 +51,7 @@ class UserService {
 			jdbc.sql("""
 					INSERT INTO app_user (id, tenant_id, display_name, phone, status)
 					VALUES (:id, :tenant, :name, :phone, :status)
-					ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name, phone = EXCLUDED.phone,
+					ON CONFLICT (tenant_id, id) DO UPDATE SET display_name = EXCLUDED.display_name, phone = EXCLUDED.phone,
 					                               status = EXCLUDED.status
 					""").param("id", id).param("tenant", tenant).param("name", displayName).param("phone", phone)
 					.param("status", status).update();

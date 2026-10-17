@@ -29,16 +29,16 @@ END $$;
 REVOKE ALL ON FUNCTION tarazu_make_append_only(regclass) FROM PUBLIC;
 
 CREATE TABLE business (
-    id         uuid PRIMARY KEY,
+    id         uuid        NOT NULL,
     tenant_id  uuid        NOT NULL REFERENCES tenant (id),
     name       text        NOT NULL,
     -- 'regular' issues tax invoices, 'composition' issues bills of supply, 'non_gst' is unregistered.
     gst_mode   text        NOT NULL DEFAULT 'non_gst' CHECK (gst_mode IN ('regular', 'composition', 'non_gst')),
     gstin      text,
     state_code text CHECK (state_code ~ '^[0-9]{2}$'),
-    created_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (tenant_id, id)
+    created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE business ADD PRIMARY KEY (tenant_id, id);
 
 -- store gets a business parent. The migration role owns the tables, so lift FORCE for the backfill only
 -- (RLS would hide every existing row from a session with no tenant bound). business gets RLS afterwards.
@@ -50,6 +50,10 @@ SELECT gen_random_uuid(), t.id, t.name FROM tenant t
 WHERE EXISTS (SELECT 1 FROM store s WHERE s.tenant_id = t.id);
 UPDATE store s SET business_id = (SELECT b.id FROM business b WHERE b.tenant_id = s.tenant_id LIMIT 1);
 ALTER TABLE store ALTER COLUMN business_id SET NOT NULL;
+-- Entity ids are only unique within a tenant, so another tenant reusing an id can never collide with
+-- (or probe for) this tenant's rows. Composite keys everywhere; the V1 tables are converted here.
+ALTER TABLE store  DROP CONSTRAINT store_pkey,  ADD PRIMARY KEY (tenant_id, id);
+ALTER TABLE device DROP CONSTRAINT device_pkey, ADD PRIMARY KEY (tenant_id, id);
 ALTER TABLE store ADD FOREIGN KEY (tenant_id, business_id) REFERENCES business (tenant_id, id);
 ALTER TABLE store FORCE ROW LEVEL SECURITY;
 ALTER TABLE tenant FORCE ROW LEVEL SECURITY;
@@ -65,7 +69,7 @@ ALTER TABLE device
     ADD COLUMN revoke_reason text;
 
 CREATE TABLE app_user (
-    id                 uuid PRIMARY KEY,
+    id                 uuid        NOT NULL,
     tenant_id          uuid        NOT NULL REFERENCES tenant (id),
     display_name       text        NOT NULL,
     phone              text,
@@ -76,9 +80,9 @@ CREATE TABLE app_user (
     pin_set_at         timestamptz,
     pin_failed_count   integer     NOT NULL DEFAULT 0,
     pin_locked_until   timestamptz,
-    created_at         timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (tenant_id, id)
+    created_at         timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE app_user ADD PRIMARY KEY (tenant_id, id);
 SELECT tarazu_enable_tenant_rls('app_user');
 
 -- A user holds roles tenant-wide (business_id/store_id null) or scoped to a business/store.
@@ -104,7 +108,7 @@ ALTER TABLE device ADD FOREIGN KEY (tenant_id, revoked_by)    REFERENCES app_use
 
 -- Who did what, when, why. No hard delete of anything finalised: the evidence lives here.
 CREATE TABLE audit_log (
-    id              uuid PRIMARY KEY,
+    id              uuid        NOT NULL,
     tenant_id       uuid        NOT NULL REFERENCES tenant (id),
     occurred_at     timestamptz NOT NULL DEFAULT now(),
     actor_user_id   uuid,
@@ -119,6 +123,7 @@ CREATE TABLE audit_log (
     -- claim must be recorded (and flagged) rather than fail the write. actor_device_id is authenticated.
     FOREIGN KEY (tenant_id, actor_device_id) REFERENCES device (tenant_id, id)
 );
+ALTER TABLE audit_log ADD PRIMARY KEY (tenant_id, id);
 CREATE INDEX audit_log_entity_idx ON audit_log (tenant_id, entity_type, entity_id, occurred_at DESC);
 CREATE INDEX audit_log_time_idx ON audit_log (tenant_id, occurred_at DESC);
 -- One audit row per (operation, action): replaying an operation never double-logs.

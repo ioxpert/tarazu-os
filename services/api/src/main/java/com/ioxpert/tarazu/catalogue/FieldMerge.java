@@ -30,7 +30,7 @@ final class FieldMerge {
 			cols.append(", ").append(f);
 			vals.append(", :f_").append(f);
 		}
-		var stmt = jdbc.sql("INSERT INTO " + table + " (" + cols + ") VALUES (" + vals + ") ON CONFLICT (id) DO NOTHING")
+		var stmt = jdbc.sql("INSERT INTO " + table + " (" + cols + ") VALUES (" + vals + ") ON CONFLICT (tenant_id, id) DO NOTHING")
 				.param("id", op.entityId()).param("tenant", op.tenantId())
 				.param("clock", json.writeValueAsString(clock));
 		for (var e : fields.entrySet()) {

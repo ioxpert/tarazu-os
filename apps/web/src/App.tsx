@@ -1,6 +1,11 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { fetchApiHealth } from './lib/health'
 import { requestPersistence, type StorageStatus } from './lib/storage'
+import { SyncStatusBadge } from './sync/SyncStatusBadge'
+
+const HARNESS_ENABLED = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEV_HARNESS === 'true'
+// Lazy: the harness (and PowerSync with SQLite WASM behind it) never loads unless this route is opened.
+const SyncHarness = lazy(() => import('./dev/SyncHarness'))
 
 function useOnline() {
   const [online, setOnline] = useState(() => navigator.onLine)
@@ -18,6 +23,7 @@ function useOnline() {
 }
 
 export function App() {
+  const harness = HARNESS_ENABLED && window.location.hash === '#/dev/sync'
   const online = useOnline()
   const [storage, setStorage] = useState<StorageStatus | null>(null)
   const [api, setApi] = useState<'checking' | 'up' | 'down'>('checking')
@@ -34,6 +40,14 @@ export function App() {
       .catch(() => setApi('down'))
     return () => ctrl.abort()
   }, [online])
+
+  if (harness) {
+    return (
+      <Suspense fallback={<p>Loading harness…</p>}>
+        <SyncHarness />
+      </Suspense>
+    )
+  }
 
   return (
     <main className="shell">
@@ -54,6 +68,9 @@ export function App() {
                   ? `persistent (${storage.usageMb} MB of ${storage.quotaMb} MB)`
                   : 'not persistent, install the app to protect data'}
           </strong>
+        </li>
+        <li>
+          Sync: <SyncStatusBadge />
         </li>
         <li data-ok={api === 'up'}>
           Server: <strong>{!online ? 'unreachable (offline)' : api}</strong>

@@ -13,7 +13,7 @@ SELECT tarazu_enable_tenant_rls('tenant_setting');
 -- Purpose-specific consent. Nothing is pre-selected: absence of a grant event means no consent.
 -- Withdrawal is a new event, never an edit.
 CREATE TABLE consent_event (
-    id               uuid PRIMARY KEY,
+    id               uuid        NOT NULL,
     tenant_id        uuid        NOT NULL REFERENCES tenant (id),
     subject_type     text        NOT NULL CHECK (subject_type IN ('party', 'user')),
     subject_id       uuid        NOT NULL,
@@ -25,10 +25,10 @@ CREATE TABLE consent_event (
     idempotency_key  text        NOT NULL,
     occurred_at      timestamptz NOT NULL,
     created_at       timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (tenant_id, id),
     UNIQUE (tenant_id, idempotency_key),
     FOREIGN KEY (tenant_id, recorded_by) REFERENCES app_user (tenant_id, id)
 );
+ALTER TABLE consent_event ADD PRIMARY KEY (tenant_id, id);
 CREATE INDEX consent_event_subject_idx ON consent_event (tenant_id, subject_type, subject_id, purpose, occurred_at DESC);
 SELECT tarazu_enable_tenant_rls('consent_event');
 SELECT tarazu_make_append_only('consent_event');
@@ -42,7 +42,7 @@ ORDER BY tenant_id, subject_type, subject_id, purpose, occurred_at DESC, created
 
 -- Every disclosure to a third party, tied to the consent event that allowed it.
 CREATE TABLE third_party_sharing_log (
-    id               uuid PRIMARY KEY,
+    id               uuid        NOT NULL,
     tenant_id        uuid        NOT NULL REFERENCES tenant (id),
     subject_type     text        NOT NULL CHECK (subject_type IN ('party', 'user')),
     subject_id       uuid        NOT NULL,
@@ -56,6 +56,7 @@ CREATE TABLE third_party_sharing_log (
     UNIQUE (tenant_id, idempotency_key),
     FOREIGN KEY (tenant_id, consent_event_id) REFERENCES consent_event (tenant_id, id)
 );
+ALTER TABLE third_party_sharing_log ADD PRIMARY KEY (tenant_id, id);
 CREATE INDEX sharing_log_subject_idx ON third_party_sharing_log (tenant_id, subject_type, subject_id, shared_at DESC);
 SELECT tarazu_enable_tenant_rls('third_party_sharing_log');
 SELECT tarazu_make_append_only('third_party_sharing_log');

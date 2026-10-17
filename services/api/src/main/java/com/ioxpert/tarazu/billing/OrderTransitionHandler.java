@@ -64,7 +64,7 @@ class OrderTransitionHandler implements EntityOperationHandler {
 		boolean legal = noop || LEGAL.get(from).contains(to);
 		int inserted = jdbc.sql("""
 				INSERT INTO order_transition (id, tenant_id, order_id, from_state, to_state, applied, reason, device_id, hlc, operation_id)
-				VALUES (:id, :tenant, :order, :from, :to, :applied, :reason, :device, :hlc, :op) ON CONFLICT (id) DO NOTHING
+				VALUES (:id, :tenant, :order, :from, :to, :applied, :reason, :device, :hlc, :op) ON CONFLICT (tenant_id, id) DO NOTHING
 				""").param("id", op.entityId()).param("tenant", op.tenantId()).param("order", order).param("from", from)
 				.param("to", to).param("applied", legal).param("reason", op.payload().optText("reason").orElse(null))
 				.param("device", op.deviceId()).param("hlc", op.hlc().raw()).param("op", op.operationId()).update();

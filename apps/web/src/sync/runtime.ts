@@ -29,6 +29,19 @@ const REFRESH_MS = 2000
 let runtimePromise: Promise<SyncRuntime> | null = null
 let activeConfig: SyncConfig | null = null
 
+/**
+ * Unsent operations = queued op_log rows only. getUploadQueueStats() would also count the optimistic local-effect
+ * writes (stock_balance, ...) that share the queue, and those are discarded, not sent.
+ */
+async function pendingOperations(db: PowerSyncDatabase): Promise<number> {
+  try {
+    const row = await db.get<{ n: number }>("SELECT count(*) AS n FROM ps_crud WHERE json_extract(data, '$.type') = 'op_log'")
+    return row.n
+  } catch {
+    return (await db.getUploadQueueStats()).count
+  }
+}
+
 /** Starts (once) and returns the runtime for the stored config. Rejects if the device is not configured. */
 export function getSyncRuntime(): Promise<SyncRuntime> {
   runtimePromise ??= start().catch((e) => {
@@ -50,11 +63,11 @@ async function start(): Promise<SyncRuntime> {
   await db.init()
 
   const refresh = async () => {
-    const [stats, issues] = await Promise.all([
-      db.getUploadQueueStats(),
+    const [pending, issues] = await Promise.all([
+      pendingOperations(db),
       db.get<{ n: number }>('SELECT count(*) AS n FROM op_issue WHERE acknowledged_at IS NULL'),
     ])
-    syncStore.update({ pendingOps: stats.count, openIssues: issues.n })
+    syncStore.update({ pendingOps: pending, openIssues: issues.n })
   }
 
   const signals: SyncSignals = {

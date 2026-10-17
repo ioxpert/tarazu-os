@@ -161,6 +161,20 @@ export const READ_MODEL_TABLES = {
     note: column.text,
     occurred_at: column.text,
   }),
+  purchase_receipt: new Table({
+    tenant_id: column.text,
+    store_id: column.text,
+    device_id: column.text,
+    series: column.text,
+    number: column.integer,
+    supplier_id: column.text,
+    supplier_ref: column.text,
+    receipt_date: column.text,
+    total_paise: column.integer,
+    lines: column.text, // JSON text
+    hlc: column.text,
+    created_at: column.text,
+  }),
   payment: new Table({
     tenant_id: column.text,
     store_id: column.text,

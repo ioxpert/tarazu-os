@@ -1830,16 +1830,30 @@ components:
         approval: { $ref: '#/components/schemas/Approval' }
     PurchaseReceiptPayload:
       type: object
-      description: entityType purchase_receipt, create only.
+      description: |
+        entityType purchase_receipt, create only (goods received; a return to the supplier is a new document).
+        `totalPaise` = sum(lines.lineTotalPaise), tax-inclusive what was paid or owed to the supplier. The stock
+        itself arrives as one stock_movement (reason purchase) per line, written in the same local transaction;
+        money paid is a `payment` (direction out) and money still owed is a `khata_entry` credit on the supplier
+        (balance negative = the merchant owes them). A total that does not match the lines is flagged
+        (purchase_total_mismatch), never rejected: the goods are already on the shelf.
       required: [series, number, receiptDate, totalPaise]
       properties:
-        series: { type: string }
+        series: { type: string, description: 'Device-scoped, e.g. A1B2C3D4-PR-2026-27' }
         number: { type: integer, format: int64, minimum: 1 }
         supplierId: { type: [string, 'null'], format: uuid }
-        supplierRef: { type: [string, 'null'] }
+        supplierRef: { type: [string, 'null'], description: The suppliers own bill number }
         receiptDate: { type: string, format: date }
         totalPaise: { type: integer, format: int64, minimum: 0 }
-        lines: { type: array, items: { type: object, additionalProperties: true } }
+        lines: { type: array, maxItems: 500, items: { $ref: '#/components/schemas/PurchaseLine' } }
+    PurchaseLine:
+      type: object
+      required: [productId, qtyMilli, unitCostPaise, lineTotalPaise]
+      properties:
+        productId: { type: string, format: uuid }
+        qtyMilli: { type: integer, format: int64, minimum: 1, description: 'Milli-units of the product BASE unit' }
+        unitCostPaise: { type: integer, format: int64, minimum: 0, description: 'Cost per BASE unit, tax-inclusive' }
+        lineTotalPaise: { type: integer, format: int64, minimum: 0, description: 'round(qty x unit cost), what this line cost' }
     OrderPayload:
       type: object
       description: entityType order, create only; afterwards state changes only through order_transition.

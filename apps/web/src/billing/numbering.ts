@@ -30,11 +30,18 @@ export function creditNoteSeries(deviceId: string, fy: string): string {
   return `${seriesPrefix(deviceId)}-CN-${fy}`
 }
 
-/** Display label: 'A1B2C3D4-2026-27' + 17 -> 'A1B2C3D4/2026-27/17'; credit note series -> 'A1B2C3D4/CN/2026-27/17'. */
+export function purchaseSeries(deviceId: string, fy: string): string {
+  return `${seriesPrefix(deviceId)}-PR-${fy}`
+}
+
+/**
+ * Display label: 'A1B2C3D4-2026-27' + 17 -> 'A1B2C3D4/2026-27/17'; credit note series -> 'A1B2C3D4/CN/2026-27/17';
+ * purchase receipt series -> 'A1B2C3D4/PR/2026-27/17'.
+ */
 export function documentLabel(series: string, number: number): string {
-  const m = /^([0-9A-Z]{8})-(CN-)?(\d{4}-\d{2})$/.exec(series)
+  const m = /^([0-9A-Z]{8})-(CN-|PR-)?(\d{4}-\d{2})$/.exec(series)
   if (!m) return `${series}/${number}`
-  return `${m[1]}/${m[2] ? 'CN/' : ''}${m[3]}/${number}`
+  return `${m[1]}/${m[2] ? m[2].replace('-', '/') : ''}${m[3]}/${number}`
 }
 
 const seqKey = (series: string) => `seq:${series}`

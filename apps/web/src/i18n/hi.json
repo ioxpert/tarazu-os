@@ -194,7 +194,12 @@
     "changePrice": "दाम बदलें",
     "priceSaved": "नया दाम सहेज लिया।",
     "pin": "बिल स्क्रीन पर दिखाएँ",
-    "unpin": "बिल स्क्रीन पर न दिखाएँ"
+    "unpin": "बिल स्क्रीन पर न दिखाएँ",
+    "countAction": "स्टॉक गिनें",
+    "countHint": "दुकान में जितना है वह लिखें। फ़र्क सहेज लिया जाएगा।",
+    "countDamage": "खोया या ख़राब माल",
+    "countSaved": "स्टॉक ठीक किया।",
+    "countMatches": "स्टॉक पहले से सही है।"
   },
   "itemForm": {
     "title": "सामान जोड़ें",
@@ -394,7 +399,56 @@
       "no_open_shift": "कोई शिफ़्ट खुली नहीं है।",
       "customer_not_found": "ग्राहक नहीं मिला।",
       "invalid_phone": "10 अंकों का मोबाइल नंबर लिखें।",
-      "invalid_credit_limit": "उधार की सीमा जाँचें।"
+      "invalid_credit_limit": "उधार की सीमा जाँचें।",
+      "supplier_needed": "जो रकम देनी है उसके लिए सप्लायर चुनें।",
+      "nothing_received": "जो सामान आया वह जोड़ें।",
+      "invalid_count": "गिनी हुई मात्रा जाँचें।"
+    }
+  },
+  "purchase": {
+    "title": "माल आया",
+    "supplier": "सप्लायर",
+    "noSupplier": "कोई सप्लायर नहीं (बाज़ार से लिया)",
+    "supplierBill": "सप्लायर का बिल नंबर (ज़रूरी नहीं)",
+    "addItem": "सामान खोजें या बारकोड स्कैन करें",
+    "newItem": "सामान नहीं मिला। नया सामान जोड़ें",
+    "empty": "जो सामान आया वह जोड़ें।",
+    "lastCost": "पिछली लागत {{cost}}",
+    "margin": "मुनाफ़ा {{percent}}%",
+    "sellsBelowCost": "बिक्री का दाम लागत से कम है",
+    "save": "सहेजें",
+    "howMany": "कितना",
+    "costPer": "{{unit}} की लागत",
+    "paidNow": "अभी चुकाया?",
+    "billTotal": "बिल का कुल",
+    "mode": {
+      "cash": "नकद",
+      "upi": "UPI",
+      "bank_transfer": "बैंक ट्रांसफ़र",
+      "cheque": "चेक"
+    },
+    "owedToSupplier": "आपको सप्लायर को {{amount}} देना होगा",
+    "needSupplier": "बाकी रकम उधार रखने के लिए सप्लायर चुनें।",
+    "chooseSupplier": "सप्लायर चुनें",
+    "paidTooMuch": "बिल के कुल से ज़्यादा है।",
+    "confirmSave": "आया माल सहेजें",
+    "searchSupplier": "सप्लायर खोजें",
+    "createSupplier": "\"{{name}}\" को नया सप्लायर जोड़ें",
+    "youOwe": "आपको देना है {{amount}}",
+    "paidAhead": "अग्रिम दिया {{amount}}",
+    "history": "आए बिल",
+    "saved": "{{label}} सहेजा। स्टॉक बढ़ गया।",
+    "none": "अभी कोई बिल नहीं।",
+    "suppliers": "सप्लायर",
+    "totalYouOwe": "सप्लायर को आपको देना है",
+    "noSuppliers": "अभी कोई सप्लायर नहीं।",
+    "addSupplier": "सप्लायर जोड़ें",
+    "supplierName": "सप्लायर का नाम",
+    "iPaid": "मैंने सप्लायर को दिया",
+    "paidAmount": "{{amount}} दिए",
+    "line": {
+      "bought": "ख़रीदा",
+      "paid": "आपने दिए"
     }
   }
 }

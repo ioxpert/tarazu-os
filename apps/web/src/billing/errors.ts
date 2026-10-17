@@ -28,6 +28,9 @@ export type BillingErrorCode =
   | 'no_open_shift'
   | 'held_bill_not_found'
   | 'customer_not_found'
+  | 'supplier_needed'
+  | 'nothing_received'
+  | 'invalid_count'
   | 'invalid_phone'
   | 'invalid_credit_limit'
 

@@ -37,7 +37,7 @@ interface EntryRaw {
 /** Customers with what they owe, for the Khata home. Local read, instant offline. */
 export async function listCustomers(
   db: StateReader,
-  opts: { query?: string; filter?: CustomerFilter; sort?: CustomerSort; asOf?: Date | number } = {},
+  opts: { query?: string; filter?: CustomerFilter; sort?: CustomerSort; asOf?: Date | number; kind?: 'customer' | 'supplier' } = {},
 ): Promise<CustomerRow[]> {
   const filter = opts.filter ?? 'owing'
   const like = `%${(opts.query ?? '').trim().replace(/[%_]/g, '')}%`
@@ -46,7 +46,7 @@ export async function listCustomers(
             k.balance_paise AS balance, (SELECT max(e.occurred_at) FROM khata_entry e WHERE e.party_id = p.id) AS last_at
      FROM party p LEFT JOIN khata_balance k ON k.party_id = p.id
      WHERE (p.active IS NULL OR p.active = 1) AND (p.merged_into IS NULL OR p.merged_into = '')
-       AND (p.party_type IS NULL OR p.party_type IN ('customer', 'both'))
+       AND (p.party_type IS NULL OR p.party_type IN (${opts.kind === 'supplier' ? "'supplier', 'both'" : "'customer', 'both'"}))
        AND (p.name LIKE ? OR p.phone LIKE ?)`,
     [like, like],
   )
@@ -118,8 +118,8 @@ interface LineRaw {
 }
 
 /** The customer's khata statement, oldest first, with the running balance after every line. */
-export async function loadStatement(db: StateReader, partyId: string, asOf: Date | number = Date.now()): Promise<Statement | null> {
-  const [customer] = (await listCustomers(db, { filter: 'all', asOf })).filter((c) => c.id === partyId)
+export async function loadStatement(db: StateReader, partyId: string, asOf: Date | number = Date.now(), kind: 'customer' | 'supplier' = 'customer'): Promise<Statement | null> {
+  const [customer] = (await listCustomers(db, { filter: 'all', asOf, kind })).filter((c) => c.id === partyId)
   if (!customer) return null
   const raw = await db.getAll<LineRaw>(
     `SELECT e.id AS id, e.direction AS direction, e.amount_paise AS amount_paise, e.ref_type AS ref_type, e.ref_id AS ref_id,

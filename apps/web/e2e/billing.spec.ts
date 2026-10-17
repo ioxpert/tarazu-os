@@ -349,3 +349,15 @@ test.describe('usability rules', () => {
     await expect(page.getByLabel(/phone|gstin|email|bank/i)).toHaveCount(0)
   })
 })
+
+test.describe('quantity display', () => {
+  test('the line editor shows the real quantity, not a thousand times it', async ({ page }) => {
+    await readyHome(page)
+    await page.goto('/#/bill')
+    await page.getByTestId('item-search').fill('parle g')
+    await page.getByTestId('item-card').first().click()
+    await page.getByTestId('item-card').first().click() // 2 packets
+    await page.getByRole('button', { name: /Edit/ }).first().click()
+    await expect(page.getByRole('button', { name: /Quantity: 2/ })).toBeVisible()
+  })
+})

@@ -9,6 +9,7 @@ import com.ioxpert.tarazu.syncgateway.HandlerResult;
 import com.ioxpert.tarazu.syncgateway.InvalidPayloadException;
 import com.ioxpert.tarazu.syncgateway.Operation;
 import com.ioxpert.tarazu.syncgateway.OperationContext;
+import com.ioxpert.tarazu.syncgateway.Payload;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
@@ -56,6 +57,24 @@ class PurchaseReceiptHandler implements EntityOperationHandler {
 		if (supplier != null) {
 			ctx.require("party", supplier);
 		}
+		var lines = p.has("lines") ? p.array("lines") : null;
+		long lineSum = 0;
+		boolean badLine = false;
+		if (lines != null) {
+			var products = new java.util.LinkedHashSet<UUID>();
+			for (var n : lines) {
+				Payload l = new Payload(n);
+				products.add(l.uuid("productId"));
+				long qty = l.integer("qtyMilli");
+				long unit = l.integer("unitCostPaise");
+				long lt = l.integer("lineTotalPaise");
+				if (qty <= 0 || unit < 0 || lt < 0) {
+					badLine = true;
+				}
+				lineSum += lt;
+			}
+			ctx.requireAll("product", products);
+		}
 		UUID existing = jdbc.sql("SELECT id FROM purchase_receipt WHERE series = :s AND number = :n")
 				.param("s", series).param("n", number).query(UUID.class).optional().orElse(null);
 		if (existing != null) {
@@ -73,6 +92,14 @@ class PurchaseReceiptHandler implements EntityOperationHandler {
 				.param("date", p.date("receiptDate")).param("total", total)
 				.param("lines", p.has("lines") ? json.writeValueAsString(p.array("lines")) : "[]")
 				.param("hlc", op.hlc().raw()).param("op", op.operationId()).update();
+		// The goods are already on the shelf: a bill that does not add up is flagged for the owner, never refused.
+		if (lines != null && lineSum != total) {
+			ctx.flag("purchase_total_mismatch", op.entityId().toString(), "purchase_receipt", op.entityId(),
+					java.util.Map.of("lineSumPaise", lineSum, "totalPaise", total));
+		}
+		if (badLine) {
+			ctx.flag("purchase_line_invalid", op.entityId().toString(), "purchase_receipt", op.entityId(), java.util.Map.of());
+		}
 		return HandlerResult.applied();
 	}
 }

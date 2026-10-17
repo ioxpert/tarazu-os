@@ -1,19 +1,20 @@
 package com.ioxpert.tarazu.syncgateway;
 
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Supplier;
+
 import jakarta.validation.Valid;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
-import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestController
 @RequestMapping("/v1/sync")
 class SyncUploadController {
+
+	private static final int ATTEMPTS = 6;
 
 	private final SyncUploadService service;
 
@@ -23,17 +24,30 @@ class SyncUploadController {
 
 	@PostMapping("/upload")
 	UploadResponse upload(@Valid @RequestBody UploadRequest request) {
-		return service.upload(request);
+		return retrying(() -> service.upload(request));
 	}
 
-	@RestControllerAdvice(assignableTypes = SyncUploadController.class)
-	static class Errors {
-
-		/** Unknown store/device for this tenant (composite FKs also block cross-tenant references). */
-		@ExceptionHandler(DataIntegrityViolationException.class)
-		ProblemDetail integrity(DataIntegrityViolationException ex) {
-			return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY,
-					"Operation references an unknown store or device for this tenant");
+	/**
+	 * Two devices updating the same rows in different order can deadlock. The batch is idempotent, so the loser
+	 * is simply re-run: replaying already-stored operations is a no-op.
+	 */
+	static <T> T retrying(Supplier<T> action) {
+		for (int attempt = 1;; attempt++) {
+			try {
+				return action.get();
+			}
+			catch (ConcurrencyFailureException ex) {
+				if (attempt == ATTEMPTS) {
+					throw ex;
+				}
+				try {
+					Thread.sleep(ThreadLocalRandom.current().nextLong(5, 25L * attempt));
+				}
+				catch (InterruptedException ie) {
+					Thread.currentThread().interrupt();
+					throw ex;
+				}
+			}
 		}
 	}
 }

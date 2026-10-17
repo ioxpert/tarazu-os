@@ -27,6 +27,9 @@ export type BillingErrorCode =
   | 'shift_already_open'
   | 'no_open_shift'
   | 'held_bill_not_found'
+  | 'customer_not_found'
+  | 'invalid_phone'
+  | 'invalid_credit_limit'
 
 export class BillingError extends Error {
   constructor(

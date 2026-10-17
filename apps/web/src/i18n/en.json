@@ -101,7 +101,9 @@
     "customerOwes": "{{name}} will owe {{amount}}",
     "left": "Still to pay {{amount}}",
     "change": "Give back {{amount}}",
-    "needsOwnerPin": "This discount ({{percent}}%) is above your limit. The owner PIN is needed."
+    "needsOwnerPin": "This discount ({{percent}}%) is above your limit. The owner PIN is needed.",
+    "alreadyOverLimit": "{{name}} already owes more than the limit of {{limit}}. You can still bill.",
+    "willExceedLimit": "With this, {{name}} will owe {{after}}, above the limit of {{limit}}. You can still bill."
   },
   "approval": {
     "explain": "Needs the owner's PIN. This is recorded.",
@@ -228,8 +230,64 @@
     "title": "Khata",
     "totalOwed": "Customers owe you",
     "none": "No customer owes you anything.",
+    "noneHere": "Nobody here.",
+    "search": "Search name or phone",
+    "show": "Show",
+    "sortBy": "Sort by",
+    "filter": {
+      "owing": "Owes you",
+      "advance": "Paid ahead",
+      "all": "All"
+    },
+    "sort": {
+      "amount": "Most owed",
+      "oldest": "Longest unpaid",
+      "name": "Name"
+    },
     "owes": "owes {{amount}}",
-    "comingSoon": "Collecting money and statements are coming soon."
+    "advance": "advance {{amount}}",
+    "clear": "Clear",
+    "noPhone": "No phone",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "addCustomer": "Add customer",
+    "name": "Customer name",
+    "phoneOptional": "Phone (optional)",
+    "alreadyOwes": "Already owes (optional)",
+    "alreadyOwesHint": "From your paper khata or an old udhaar. Saved as a new entry.",
+    "previousNote": "Earlier balance",
+    "notFound": "Customer not found.",
+    "oldest_one": "Unpaid for {{count}} day",
+    "oldest_other": "Unpaid for {{count}} days",
+    "ageingNote": "{{b2}} is over 30 days old, {{b3}} is over 60 days old.",
+    "overLimit": "Over the limit of {{limit}}",
+    "limit": "Credit limit {{limit}}",
+    "customerPaid": "Customer paid",
+    "remind": "Remind on WhatsApp",
+    "addOld": "Add old balance",
+    "edit": "Edit details",
+    "statement": "Statement",
+    "noLines": "Nothing yet.",
+    "line": {
+      "bill": "Bill {{label}}",
+      "old": "Earlier balance",
+      "paid": "Paid",
+      "return": "Return"
+    },
+    "balanceAfter": "owes {{amount}} after",
+    "paymentSaved": "Payment saved.",
+    "sendThanks": "Send thanks on WhatsApp",
+    "upiRef": "UPI reference (optional)",
+    "advanceNote": "{{amount}} more than they owe. It is kept as money paid ahead.",
+    "gotMoney": "Got {{amount}}",
+    "creditLimit": "Credit limit (₹)",
+    "creditLimitHint": "You are warned when a sale goes past it. Sales are never blocked.",
+    "needPhone": "Add the customer's phone number first (Edit details).",
+    "consentAsk": "{{name}} agreed to get payment reminders on WhatsApp",
+    "consentHint": "Ask the customer first. This is saved and can be withdrawn any time.",
+    "consentSave": "Save their yes",
+    "consentWithdraw": "Customer does not want reminders any more",
+    "reminderPreview": "Reminder message"
   },
   "shift": {
     "title": "Cash drawer",
@@ -331,7 +389,10 @@
       "return_amount_zero": "Nothing to give back for this quantity.",
       "refund_mismatch": "The refund does not match the credit note.",
       "shift_already_open": "A shift is already open.",
-      "no_open_shift": "No shift is open."
+      "no_open_shift": "No shift is open.",
+      "customer_not_found": "Customer not found.",
+      "invalid_phone": "Enter a 10 digit mobile number.",
+      "invalid_credit_limit": "Check the credit limit."
     }
   }
 }

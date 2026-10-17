@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { loadPolicy, DEFAULT_POLICY, type BillingPolicy } from '../billing/policy'
 import { cacheApprovers } from '../billing/approvals'
+import { flushConsent } from '../khata/consent'
 import { defaultProfile, getState, loadProfile, saveProfile } from '../billing/settings'
 import { loadTaxRules, type TaxRule } from '../billing/tax'
 import type { MerchantProfile } from '../billing/types'
@@ -73,6 +74,12 @@ async function refreshFromServer(rt: SyncRuntime, onProfile: (p: MerchantProfile
     }
   } catch {
     // offline or server down: billing carries on with what the device has
+  }
+  try {
+    // customer consent events saved offline reach the server's consent ledger
+    await flushConsent(rt.db as unknown as LocalDb, { apiBase, deviceToken })
+  } catch {
+    // same
   }
   try {
     const res = await fetch(`${apiBase}/v1/identity/approvers`, { headers, signal: timeout() })

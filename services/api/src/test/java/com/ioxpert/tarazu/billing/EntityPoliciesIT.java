@@ -190,6 +190,25 @@ class EntityPoliciesIT extends ApiIT {
 	// ---------- ledger ----------
 
 	@Test
+	void aCreditLimitIsAdviceNotARefusal() throws Exception {
+		Seed seed = seedTenant();
+		var d = new Ops(seed);
+		UUID party = UUID.randomUUID();
+		upload(seed, d.party(party, "Verma"), d.op("party", party, "update", m("creditLimitPaise", 100_000)));
+		var over = upload(seed, d.khata(UUID.randomUUID(), party, "debit", 120_000));
+		assertThat(statusOf(over, 0)).as("recorded and flagged for review, never rejected").isEqualTo("flagged");
+		assertThat(openFlags(seed)).contains("credit_limit_exceeded");
+		assertThat(count(seed, "SELECT balance_paise FROM khata_balance WHERE party_id = ?", party)).isEqualTo(120_000);
+
+		upload(seed, d.khata(UUID.randomUUID(), party, "credit", 30_000));
+		assertThat(openFlags(seed)).as("back under the limit closes the flag").doesNotContain("credit_limit_exceeded");
+
+		UUID noLimit = UUID.randomUUID();
+		upload(seed, d.party(noLimit, "Walk-in regular"), d.khata(UUID.randomUUID(), noLimit, "debit", 9_000_000));
+		assertThat(openFlags(seed)).doesNotContain("credit_limit_exceeded");
+	}
+
+	@Test
 	void khataBalanceIsTheSumOfAppendOnlyEntriesAndPaymentsAreImmutable() throws Exception {
 		Seed seed = seedTenant();
 		var d = new Ops(seed);

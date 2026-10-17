@@ -149,6 +149,18 @@ export const READ_MODEL_TABLES = {
     variance_paise: column.integer,
     closed_at: column.text,
   }),
+  // statement lines; id = the khata_entry id. balance_paise in khata_balance is their sum.
+  khata_entry: new Table({
+    tenant_id: column.text,
+    store_id: column.text,
+    party_id: column.text,
+    direction: column.text,
+    amount_paise: column.integer,
+    ref_type: column.text,
+    ref_id: column.text,
+    note: column.text,
+    occurred_at: column.text,
+  }),
   payment: new Table({
     tenant_id: column.text,
     store_id: column.text,
@@ -213,6 +225,24 @@ const shareQueue = new Table(
   { localOnly: true },
 )
 
+/**
+ * Customer consent events recorded on this counter, waiting to reach POST /v1/consent/events (the server's consent
+ * ledger is the record; this is the outbox and the offline answer to "may I send this customer a reminder?").
+ * id = the consent event's UUIDv7 and its idempotency key, so a retried flush is harmless.
+ */
+const consentOutbox = new Table(
+  {
+    party_id: column.text,
+    purpose: column.text,
+    action: column.text,
+    policy_version: column.text,
+    channel: column.text,
+    occurred_at: column.text,
+    sent_at: column.text,
+  },
+  { localOnly: true },
+)
+
 export const schema = new Schema({
   op_log: opLog,
   ...READ_MODEL_TABLES,
@@ -221,4 +251,5 @@ export const schema = new Schema({
   held_bill: heldBill,
   approver,
   share_queue: shareQueue,
+  consent_outbox: consentOutbox,
 })

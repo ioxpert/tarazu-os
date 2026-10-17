@@ -27,6 +27,9 @@ bucket_definitions:
       # projection: id = party_id
       - SELECT party_id AS id, tenant_id, party_id, balance_paise, entry_count
         FROM khata_balance WHERE tenant_id = bucket.merchant_id
+      # the statement lines behind the balance
+      - SELECT id, tenant_id, store_id, party_id, direction, amount_paise, ref_type, ref_id, note, occurred_at
+        FROM khata_entry WHERE tenant_id = bucket.merchant_id
       - SELECT id, tenant_id, store_id, device_id, series, number, doc_type, invoice_date, party_id, subtotal_paise,
                discount_paise, tax_paise, round_off_paise, total_paise, hlc, created_at
         FROM invoice WHERE tenant_id = bucket.merchant_id

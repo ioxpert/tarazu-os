@@ -271,17 +271,19 @@ class EntityPoliciesIT extends ApiIT {
 		Seed seed = seedTenant();
 		var d = new Ops(seed);
 		UUID product = UUID.randomUUID();
-		Map<String, Object> discounted = Map.of("discountPaise", 500, "totalPaise", 9500);
+		Map<String, Object> discounted = Map.of("discountPaise", 1000, "totalPaise", 9000);
 		Map<String, Object> approved = new LinkedHashMap<>(discounted);
 		approved.put("approval", m("approverUserId", seed.owner(), "reason", "regular customer"));
 		var res = upload(seed, d.product(product, "Tea"),
 				d.create("invoice", UUID.randomUUID(), invoicePayload(product, "C1", 1, discounted)),
 				d.create("invoice", UUID.randomUUID(), invoicePayload(product, "C1", 2, approved)),
-				d.create("invoice", UUID.randomUUID(), invoicePayload(product, "C1", 3, Map.of("invoiceDate", "2026-10-10"))));
+				d.create("invoice", UUID.randomUUID(), invoicePayload(product, "C1", 3, Map.of("invoiceDate", "2026-10-10"))),
+				d.create("invoice", UUID.randomUUID(), invoicePayload(product, "C1", 4, Map.of("discountPaise", 500, "totalPaise", 9500))));
+		assertThat(statusOf(res, 4)).as("5% is inside the unapproved band").isEqualTo("applied");
 		assertThat(statusOf(res, 1)).isEqualTo("flagged");
 		assertThat(statusOf(res, 2)).isEqualTo("applied");
 		assertThat(statusOf(res, 3)).as("backdated without approval").isEqualTo("flagged");
-		assertThat(count(seed, "SELECT count(*) FROM invoice")).as("all three sales persisted").isEqualTo(3);
+		assertThat(count(seed, "SELECT count(*) FROM invoice")).as("all four sales persisted").isEqualTo(4);
 		assertThat(count(seed, "SELECT count(*) FROM audit_log WHERE action = 'invoice.owner_approved' AND reason = 'regular customer'")).isEqualTo(1);
 	}
 

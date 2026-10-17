@@ -110,3 +110,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .status { list-style: none; padding: 0; display: grid; gap: .5rem; }
 .status li { padding: .75rem 1rem; border-radius: .5rem; border: 1px solid #8884; border-left: 6px solid #d97706; }
 .status li[data-ok='true'] { border-left-color: #0f766e; }
+
+/* Bill screen: pick on the left, bill on the right when there is room; stacked on a phone. */
+.bill-body { display: grid; grid-template-columns: 1fr; align-content: start; }
+.bill-pick, .bill-cart { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+@media (min-width: 800px) {
+  .bill-body { grid-template-columns: 1.3fr 1fr; align-items: start; overflow: hidden; }
+  .bill-pick, .bill-cart { max-height: 100%; overflow-y: auto; }
+}

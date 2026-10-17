@@ -12,7 +12,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "gen:api": "openapi-typescript ../../packages/contract/openapi.yaml -o src/api/schema.d.ts"
+    "gen:api": "openapi-typescript ../../packages/contract/openapi.yaml -o src/api/schema.d.ts",
+    "build:starter-pack": "node scripts/build-starter-pack.mjs",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@journeyapps/wa-sqlite": "^2.0.7",
@@ -29,6 +31,7 @@
     "@playwright/test": "^1.56.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

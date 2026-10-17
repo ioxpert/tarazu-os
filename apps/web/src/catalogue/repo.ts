@@ -144,12 +144,12 @@ export function listCategories(items: readonly CatalogueItem[], tiles: readonly 
     .sort((a, b) => b.count - a.count || a.id.localeCompare(b.id))
 }
 
-/** Units sold per product over the last `days` days, from invoice_line (cheap: one GROUP BY). Feeds CatalogueIndex popularity. */
+/** Invoice lines per product (how often it was sold) over the last `days` days, from invoice_line (cheap: one GROUP BY). Feeds CatalogueIndex popularity. */
 export async function loadPopularity(db: LocalDb, opts: { days?: number; now?: Date } = {}): Promise<Map<string, number>> {
   const since = new Date((opts.now ?? new Date()).getTime() - (opts.days ?? 30) * 86_400_000).toISOString().slice(0, 10)
   const rows = await db.getAll<{ product_id: string; n: number }>(
     `SELECT l.product_id AS product_id, COUNT(*) AS n FROM invoice_line l JOIN invoice i ON i.id = l.invoice_id
-     WHERE substr(i.invoice_date, 1, 10) >= ? GROUP BY l.product_id ORDER BY n DESC LIMIT 500`,
+     WHERE substr(i.invoice_date, 1, 10) >= ? GROUP BY l.product_id ORDER BY n DESC, l.product_id LIMIT 500`,
     [since],
   )
   return new Map(rows.map((r) => [r.product_id, r.n]))
@@ -159,7 +159,7 @@ export async function loadPopularity(db: LocalDb, opts: { days?: number; now?: D
 export async function recentlySoldIds(db: LocalDb, limit = 12): Promise<string[]> {
   const rows = await db.getAll<{ product_id: string }>(
     `SELECT l.product_id AS product_id, MAX(i.created_at) AS last FROM invoice_line l JOIN invoice i ON i.id = l.invoice_id
-     GROUP BY l.product_id ORDER BY last DESC LIMIT ?`,
+     GROUP BY l.product_id ORDER BY last DESC, l.product_id LIMIT ?`,
     [limit],
   )
   return rows.map((r) => r.product_id)
@@ -339,7 +339,7 @@ export async function createItem(writer: OpLogWriter, db: LocalDb, ctx: Catalogu
   }
   const created: CatalogueItem = {
     id,
-    name: payload.name,
+    name: draft.name.trim(),
     localName: payload.localName ?? null,
     brand: payload.brand ?? null,
     category: payload.category ?? null,

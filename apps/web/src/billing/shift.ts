@@ -137,11 +137,13 @@ export async function closeShift(writer: OpLogWriter, input: CloseShiftInput): P
     result = { shiftId: shift.id, declaredCashPaise: input.declaredCashPaise, expectedCashPaise: expected, variancePaise: variance, closedAt }
     await deleteState(tx, CURRENT_KEY)
     const { tenantId, storeId, deviceId } = input.identity
+    // the optimistic row must carry the op's entity id: the server's row (same id) replaces it after sync
+    const closeId = uuidv7(new Date(input.now).getTime())
     return [
       item(
         {
           entityType: 'shift_close',
-          entityId: uuidv7(new Date(input.now).getTime()),
+          entityId: closeId,
           opType: 'create',
           payload: {
             shiftId: shift.id,
@@ -156,7 +158,7 @@ export async function closeShift(writer: OpLogWriter, input: CloseShiftInput): P
           {
             sql: `INSERT OR REPLACE INTO shift_close (id, tenant_id, store_id, device_id, shift_id, declared_cash_paise,
                     expected_cash_paise, variance_paise, closed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            params: [shift.id, tenantId, storeId, deviceId, shift.id, input.declaredCashPaise, expected, variance, closedAt],
+            params: [closeId, tenantId, storeId, deviceId, shift.id, input.declaredCashPaise, expected, variance, closedAt],
           },
         ],
       ),

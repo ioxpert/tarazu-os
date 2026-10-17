@@ -1,6 +1,6 @@
 import { normalizeBarcode } from './barcode'
 import { CatalogueIndex } from './search'
-import { phoneticString, phoneticTokens } from './translit'
+import { phoneticKey, phoneticString, phoneticTokens, rawTokens } from './translit'
 import { parseQtyMilli } from './uom'
 import type { CatalogueItem } from './types'
 
@@ -89,8 +89,10 @@ function coreTokens(name: string, brandTokens: Set<string>): Set<string> {
   const size = parseSize(norm)
   const text = size ? norm.replace(size.matched, ' ') : norm
   const out = new Set<string>()
-  for (let t of phoneticTokens(text)) {
-    if (brandTokens.has(t) || STOP.has(t)) continue
+  for (const raw of rawTokens(text)) {
+    // model codes such as AA / AAA must stay apart: phonetic folding would collapse repeated letters
+    let t = /^([a-z])\1+$/.test(raw) && raw.length <= 4 ? raw : phoneticKey(raw === 'g' ? 'ji' : raw)
+    if (!t || brandTokens.has(t) || STOP.has(t)) continue
     if (t.length > 3 && t.endsWith('s')) t = t.slice(0, -1)
     out.add(t)
   }
@@ -133,7 +135,9 @@ export function findDuplicates(
     if (brandStr && itemBrand && brandStr !== itemBrand) continue // another maker's version is a different product
     const itemSize = parseSize(item.name)
     if (candSize && itemSize && candSize.key !== itemSize.key) continue // 56 g vs 100 g are different packs
-    const brandTokens = new Set([...phoneticTokens(candidate.brand ?? ''), ...phoneticTokens(item.brand ?? '')])
+    // both brands known and equal: compare what is left of the names; otherwise compare the full names, so a generic
+    // 'Suji Rava' is not the same product as 'Aashirvaad Suji Rawa'
+    const brandTokens = brandStr && itemBrand ? new Set([...phoneticTokens(candidate.brand ?? ''), ...phoneticTokens(item.brand ?? '')]) : new Set<string>()
     const a = coreTokens(candidate.name, brandTokens)
     const b = coreTokens(item.name, brandTokens)
     const j = jaccard(a, b)

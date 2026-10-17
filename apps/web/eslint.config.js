@@ -9,4 +9,10 @@ export default tseslint.config(
     plugins: { 'react-hooks': reactHooks },
     rules: { ...reactHooks.configs.recommended.rules },
   },
+  {
+    // Screens read the on-device database in effects and set state when it answers. That is the intended
+    // pattern for local-first data here; the rule targets effects that derive state from props synchronously.
+    files: ['src/ui/**/*.tsx'],
+    rules: { 'react-hooks/set-state-in-effect': 'off' },
+  },
 )

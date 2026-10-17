@@ -21,6 +21,140 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/otp/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which contact proofs sign-up needs on this deployment (public)
+         * @description `mode` is chosen per deployment: `email`, `phone`, `either` (give one or both; each one given is verified) or
+         *     `both` (email and phone are both required and verified). `enabled` is false when OTP is not configured (no pepper
+         *     or no delivery for an enabled channel); the other auth calls then answer 503.
+         */
+        get: operations["getOtpConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/signup/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start onboarding; sends a code to each contact that must be verified (public)
+         * @description Creates nothing durable yet. A contact that already has an account is 409 `contact_in_use`. Codes per contact are rate-limited.
+         */
+        post: operations["startSignup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/signup/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify one contact's code; when the last required contact is verified the tenant, first business, store and owner are created (public)
+         * @description Wrong codes are counted (5 per code, then 429 `too_many_attempts`; ask for a new one). While contacts remain,
+         *     `status` is `pending` with `remainingChannels`. On `completed`, `session` is the owner's bearer session.
+         */
+        post: operations["verifySignup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/signup/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a fresh code for one contact of a sign-up; the earlier code stops working (public) */
+        post: operations["resendSignupCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/login/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a login code to an email or phone (public)
+         * @description Always 202 with a challenge token, whether or not an account exists (no account enumeration).
+         */
+        post: operations["startLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/login/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Exchange a login code for a bearer session (public) */
+        post: operations["verifyLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** End the calling session */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/sync/upload": {
         parameters: {
             query?: never;
@@ -165,6 +299,23 @@ export interface paths {
         get?: never;
         /** Create or update a business (owner). GST mode changes are audited. */
         put: operations["putBusiness"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/identity/stores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stores of this tenant (needed to register a device after signing in) */
+        get: operations["listStores"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -492,6 +643,87 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        OtpConfig: {
+            enabled: boolean;
+            /** @enum {string} */
+            mode: "email" | "phone" | "either" | "both";
+            /** @description Channels a code can be sent on (sign-up and login). */
+            channels: ("email" | "phone")[];
+            /** @description Contacts sign-up always needs. Empty in `either` mode (give at least one). */
+            signupRequires: ("email" | "phone")[];
+            codeTtlMinutes: number;
+            resendSeconds: number;
+        };
+        SignupStartRequest: {
+            ownerName: string;
+            businessName: string;
+            email?: string | null;
+            /** @description Indian mobile (10 digits, +91 implied) or +country number */
+            phone?: string | null;
+        };
+        ChallengeInfo: {
+            /** @enum {string} */
+            channel: "email" | "phone";
+            /** @description Masked contact, for example a***@example.in */
+            sentTo: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            resendAfter: string;
+        };
+        SignupStarted: {
+            /** @description Opaque; send it back with each verify/resend */
+            signupToken: string;
+            challenges: components["schemas"]["ChallengeInfo"][];
+        };
+        SignupVerifyRequest: {
+            signupToken: string;
+            /** @enum {string} */
+            channel: "email" | "phone";
+            code: string;
+        };
+        SignupResendRequest: {
+            signupToken: string;
+            /** @enum {string} */
+            channel: "email" | "phone";
+        };
+        Session: {
+            /** @description Bearer session token */
+            token: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: uuid */
+            tenantId: string;
+            /** Format: uuid */
+            userId: string;
+            roles: components["schemas"]["Role"][];
+        };
+        SignupProgress: {
+            /** @enum {string} */
+            status: "pending" | "completed";
+            remainingChannels: ("email" | "phone")[];
+            session?: components["schemas"]["Session"] | null;
+            /** Format: uuid */
+            businessId?: string | null;
+            /** Format: uuid */
+            storeId?: string | null;
+        };
+        LoginStartRequest: {
+            /** @enum {string} */
+            channel: "email" | "phone";
+            contact: string;
+        };
+        LoginStarted: {
+            challengeToken: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            resendAfter: string;
+        };
+        LoginVerifyRequest: {
+            challengeToken: string;
+            code: string;
+        };
         Health: {
             /** @example UP */
             status: string;
@@ -724,7 +956,10 @@ export interface components {
         };
         UserRequest: {
             displayName: string;
+            /** @description Registers the number for OTP login; 409 contact_in_use if another account holds it */
             phone?: string | null;
+            /** @description Registers the address for OTP login */
+            email?: string | null;
             /**
              * @default active
              * @enum {string}
@@ -753,6 +988,7 @@ export interface components {
             id: string;
             displayName: string;
             phone?: string | null;
+            email?: string | null;
             /** @enum {string} */
             status: "active" | "disabled";
             pinSet: boolean;
@@ -1176,6 +1412,191 @@ export interface operations {
             };
         };
     };
+    getOtpConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Config */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OtpConfig"];
+                };
+            };
+        };
+    };
+    startSignup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupStartRequest"];
+            };
+        };
+        responses: {
+            /** @description Codes sent */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupStarted"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    verifySignup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupVerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description Progress or completion */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupProgress"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            410: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    resendSignupCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupResendRequest"];
+            };
+        };
+        responses: {
+            /** @description Sent */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    startLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginStartRequest"];
+            };
+        };
+        responses: {
+            /** @description Challenge issued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginStarted"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    verifyLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginVerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description Session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            410: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+        };
+    };
     uploadOperations: {
         parameters: {
             query?: never;
@@ -1404,6 +1825,28 @@ export interface operations {
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+        };
+    };
+    listStores: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stores */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Store"][];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
         };
     };
     putStore: {

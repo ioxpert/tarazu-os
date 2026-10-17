@@ -228,6 +228,7 @@ class IdentityIT extends ApiIT {
 		UUID store = UUID.randomUUID();
 		mvc.perform(asOwner(put("/v1/identity/stores/" + store), seed).content(body(Map.of("businessId", business, "name", "Godown"))))
 				.andExpect(status().isOk());
+		mvc.perform(asOwner(get("/v1/identity/stores"), seed)).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(2));
 		mvc.perform(asOwner(put("/v1/identity/stores/" + UUID.randomUUID()), seed).content(body(Map.of("businessId", UUID.randomUUID(), "name", "Orphan"))))
 				.andExpect(status().isUnprocessableEntity());
 		mvc.perform(asOwner(put("/v1/identity/stores/" + store), seed).content(body(Map.of("businessId", seed.business(), "name", "Moved"))))

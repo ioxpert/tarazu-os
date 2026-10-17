@@ -20,7 +20,10 @@ servers:
   - url: http://localhost:8080
 security:
   - deviceToken: []
+  - sessionToken: []
 tags:
+  - name: auth
+    description: OTP onboarding and login (email, phone or both, per deployment) and bearer sessions.
   - name: sync
     description: Device upload queue, acknowledgements, review flags and PowerSync credentials.
   - name: identity
@@ -45,6 +48,187 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Health'
+  /v1/auth/otp/config:
+    get:
+      operationId: getOtpConfig
+      summary: Which contact proofs sign-up needs on this deployment (public)
+      description: |
+        `mode` is chosen per deployment: `email`, `phone`, `either` (give one or both; each one given is verified) or
+        `both` (email and phone are both required and verified). `enabled` is false when OTP is not configured (no pepper
+        or no delivery for an enabled channel); the other auth calls then answer 503.
+      tags: [auth]
+      security: []
+      responses:
+        '200':
+          description: Config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpConfig'
+  /v1/auth/signup/start:
+    post:
+      operationId: startSignup
+      summary: Start onboarding; sends a code to each contact that must be verified (public)
+      description: Creates nothing durable yet. A contact that already has an account is 409 `contact_in_use`. Codes per contact are rate-limited.
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupStartRequest'
+      responses:
+        '202':
+          description: Codes sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignupStarted'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/auth/signup/verify:
+    post:
+      operationId: verifySignup
+      summary: Verify one contact's code; when the last required contact is verified the tenant, first business, store and owner are created (public)
+      description: |
+        Wrong codes are counted (5 per code, then 429 `too_many_attempts`; ask for a new one). While contacts remain,
+        `status` is `pending` with `remainingChannels`. On `completed`, `session` is the owner's bearer session.
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupVerifyRequest'
+      responses:
+        '200':
+          description: Progress or completion
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignupProgress'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '410':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/auth/signup/resend:
+    post:
+      operationId: resendSignupCode
+      summary: Send a fresh code for one contact of a sign-up; the earlier code stops working (public)
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupResendRequest'
+      responses:
+        '202':
+          description: Sent
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/auth/login/start:
+    post:
+      operationId: startLogin
+      summary: Send a login code to an email or phone (public)
+      description: Always 202 with a challenge token, whether or not an account exists (no account enumeration).
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginStartRequest'
+      responses:
+        '202':
+          description: Challenge issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginStarted'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/auth/login/verify:
+    post:
+      operationId: verifyLogin
+      summary: Exchange a login code for a bearer session (public)
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginVerifyRequest'
+      responses:
+        '200':
+          description: Session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '410':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/auth/logout:
+    post:
+      operationId: logout
+      summary: End the calling session
+      tags: [auth]
+      security:
+        - sessionToken: []
+      responses:
+        '204':
+          description: Signed out
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
   /v1/sync/upload:
     post:
       operationId: uploadOperations
@@ -232,6 +416,24 @@ paths:
         '403':
           $ref: '#/components/responses/Problem'
         '409':
+          $ref: '#/components/responses/Problem'
+  /v1/identity/stores:
+    get:
+      operationId: listStores
+      summary: Stores of this tenant (needed to register a device after signing in)
+      tags: [identity]
+      responses:
+        '200':
+          description: Stores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Store'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
           $ref: '#/components/responses/Problem'
   /v1/identity/stores/{id}:
     put:
@@ -745,6 +947,12 @@ paths:
           $ref: '#/components/responses/Problem'
 components:
   securitySchemes:
+    sessionToken:
+      type: http
+      scheme: bearer
+      description: |
+        Owner/staff session `tzs.<tenantId>.<sessionId>.<secret>` from OTP sign-up or login (30 days, revocable by logout
+        or by disabling the user). Carries the user's roles, so management calls need no X-Staff headers.
     deviceToken:
       type: http
       scheme: bearer
@@ -777,6 +985,100 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
   schemas:
+    OtpConfig:
+      type: object
+      required: [enabled, mode, channels, signupRequires, codeTtlMinutes, resendSeconds]
+      properties:
+        enabled: { type: boolean }
+        mode: { type: string, enum: [email, phone, either, both] }
+        channels:
+          type: array
+          description: Channels a code can be sent on (sign-up and login).
+          items: { type: string, enum: [email, phone] }
+        signupRequires:
+          type: array
+          description: Contacts sign-up always needs. Empty in `either` mode (give at least one).
+          items: { type: string, enum: [email, phone] }
+        codeTtlMinutes: { type: integer }
+        resendSeconds: { type: integer }
+    SignupStartRequest:
+      type: object
+      required: [ownerName, businessName]
+      properties:
+        ownerName: { type: string, minLength: 1, maxLength: 200 }
+        businessName: { type: string, minLength: 1, maxLength: 200 }
+        email: { type: [string, 'null'], maxLength: 254 }
+        phone: { type: [string, 'null'], maxLength: 20, description: 'Indian mobile (10 digits, +91 implied) or +country number' }
+    ChallengeInfo:
+      type: object
+      required: [channel, sentTo, expiresAt, resendAfter]
+      properties:
+        channel: { type: string, enum: [email, phone] }
+        sentTo: { type: string, description: 'Masked contact, for example a***@example.in' }
+        expiresAt: { type: string, format: date-time }
+        resendAfter: { type: string, format: date-time }
+    SignupStarted:
+      type: object
+      required: [signupToken, challenges]
+      properties:
+        signupToken: { type: string, description: Opaque; send it back with each verify/resend }
+        challenges:
+          type: array
+          items: { $ref: '#/components/schemas/ChallengeInfo' }
+    SignupVerifyRequest:
+      type: object
+      required: [signupToken, channel, code]
+      properties:
+        signupToken: { type: string }
+        channel: { type: string, enum: [email, phone] }
+        code: { type: string, pattern: '^[0-9]{6}$' }
+    SignupResendRequest:
+      type: object
+      required: [signupToken, channel]
+      properties:
+        signupToken: { type: string }
+        channel: { type: string, enum: [email, phone] }
+    Session:
+      type: object
+      required: [token, expiresAt, tenantId, userId, roles]
+      properties:
+        token: { type: string, description: Bearer session token }
+        expiresAt: { type: string, format: date-time }
+        tenantId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/Role' }
+    SignupProgress:
+      type: object
+      required: [status, remainingChannels]
+      properties:
+        status: { type: string, enum: [pending, completed] }
+        remainingChannels:
+          type: array
+          items: { type: string, enum: [email, phone] }
+        session: { oneOf: [{ $ref: '#/components/schemas/Session' }, { type: 'null' }] }
+        businessId: { type: [string, 'null'], format: uuid }
+        storeId: { type: [string, 'null'], format: uuid }
+    LoginStartRequest:
+      type: object
+      required: [channel, contact]
+      properties:
+        channel: { type: string, enum: [email, phone] }
+        contact: { type: string, maxLength: 254 }
+    LoginStarted:
+      type: object
+      required: [challengeToken, expiresAt, resendAfter]
+      properties:
+        challengeToken: { type: string }
+        expiresAt: { type: string, format: date-time }
+        resendAfter: { type: string, format: date-time }
+    LoginVerifyRequest:
+      type: object
+      required: [challengeToken, code]
+      properties:
+        challengeToken: { type: string }
+        code: { type: string, pattern: '^[0-9]{6}$' }
     Health:
       type: object
       required: [status]
@@ -1014,7 +1316,8 @@ components:
       required: [displayName]
       properties:
         displayName: { type: string, minLength: 1, maxLength: 200 }
-        phone: { type: [string, 'null'], maxLength: 20 }
+        phone: { type: [string, 'null'], maxLength: 20, description: Registers the number for OTP login; 409 contact_in_use if another account holds it }
+        email: { type: [string, 'null'], maxLength: 254, description: Registers the address for OTP login }
         status: { type: string, enum: [active, disabled], default: active }
     RoleGrant:
       type: object
@@ -1038,6 +1341,7 @@ components:
         id: { type: string, format: uuid }
         displayName: { type: string }
         phone: { type: [string, 'null'] }
+        email: { type: [string, 'null'] }
         status: { type: string, enum: [active, disabled] }
         pinSet: { type: boolean }
         roles:

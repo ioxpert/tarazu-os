@@ -53,7 +53,7 @@ class IdentityController {
 	record RevokeRequest(@NotBlank @Size(max = 500) String reason) {
 	}
 
-	record UserRequest(@NotBlank @Size(max = 200) String displayName, @Size(max = 20) String phone,
+	record UserRequest(@NotBlank @Size(max = 200) String displayName, @Size(max = 20) String phone, @Size(max = 254) String email,
 			@Pattern(regexp = "active|disabled") String status) {
 	}
 
@@ -107,6 +107,11 @@ class IdentityController {
 		return org.upsertBusiness(id, body.name(), body.gstMode(), body.gstin(), body.stateCode());
 	}
 
+	@GetMapping("/stores")
+	List<OrgService.StoreView> listStores() {
+		return org.listStores();
+	}
+
 	@PutMapping("/stores/{id}")
 	OrgService.StoreView putStore(@PathVariable UUID id, @Valid @RequestBody StoreRequest body) {
 		return org.upsertStore(id, body.businessId(), body.name());
@@ -132,7 +137,7 @@ class IdentityController {
 
 	@PutMapping("/users/{id}")
 	UserService.UserView putUser(@PathVariable UUID id, @Valid @RequestBody UserRequest body) {
-		return users.upsert(id, body.displayName(), body.phone(), body.status() == null ? "active" : body.status());
+		return users.upsert(id, body.displayName(), body.phone(), body.email(), body.status() == null ? "active" : body.status());
 	}
 
 	@GetMapping("/users")

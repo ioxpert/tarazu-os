@@ -20,6 +20,7 @@ cd apps/web && npm ci && npm run dev                    # PWA on :5173, proxies 
 ```bash
 OTP_PEPPER=local-dev-pepper-change-me OTP_MODE=EITHER \
   mvn -f services/api spring-boot:run -Dspring-boot.run.arguments="--tarazu.auth.otp.dev-log-codes=true"   # codes are logged, dev only
+# real delivery: SPRING_MAIL_HOST/USERNAME/PASSWORD + OTP_EMAIL_FROM for email, TARAZU_AUTH_OTP_SMS_URL + OTP_SMS_AUTH_VALUE/TEMPLATE_ID for SMS (see application.properties)
 # then open http://localhost:5173/#/onboarding, or POST /v1/auth/signup/start; OTP_MODE = EMAIL | PHONE | EITHER | BOTH
 ```
 

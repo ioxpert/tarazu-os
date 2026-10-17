@@ -35,3 +35,11 @@ either, or both is required. Until now tenants were provisioned by hand (ADR 000
 - Operators set `OTP_PEPPER` (at least 16 random chars; rotating it invalidates logins until contacts are re-registered) and `OTP_MODE`.
 - Email deliverability and SMS DLT templates are external work; nothing here sends real messages yet.
 - OTP is weaker than device-bound keys against SIM-swap; the device token + staff PIN layers remain for counters.
+
+## Delivery adapters (addendum)
+- Email: `SmtpOtpSender` over `spring.mail.*` (any SMTP relay), active only when `spring.mail.host` is set; `OTP_EMAIL_FROM` is required then.
+- SMS: `HttpSmsOtpSender` posts a JSON body from `tarazu.auth.otp.sms.body-template` (`{{to}}`, `{{message}}`, `{{templateId}}`, JSON-escaped) to
+  any HTTPS gateway (plain http only for localhost), with one auth header. This keeps the provider choice (MSG91, a Twilio-style proxy,
+  an in-house relay) a configuration matter. The SMS wording and `OTP_SMS_TEMPLATE_ID` must match the template registered with the telecom operator (DLT).
+- A channel is enabled for OTP only when its sender exists; `GET /v1/auth/otp/config` reports `enabled:false` otherwise.
+- Not verified against a live provider (needs credentials); the adapters are tested against a local HTTP server and a capturing mail sender.

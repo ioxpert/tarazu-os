@@ -15,6 +15,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const PORT = 4179
 const URL_ = `http://localhost:${PORT}/#/dev/sync`
 const OUT = 'dist-smoke'
+// NFR: invoice commit P95 < 300 ms locally. Override only on a heavily loaded CI box.
+const MAX_P95_MS = Number(process.env.SMOKE_MAX_P95_MS ?? 300)
 
 function loadPlaywright() {
   const attempts = [() => createRequire(join(root, 'package.json'))('playwright')]
@@ -70,7 +72,7 @@ try {
   const latency = (await page.getByTestId('latency').textContent()) ?? ''
   console.log(latency.trim())
   const p95 = Number(/P95 ([\d.]+) ms/.exec(latency)?.[1])
-  if (!(p95 < 300)) fail(`commit P95 ${p95} ms is not under 300 ms`)
+  if (!(p95 < MAX_P95_MS)) fail(`commit P95 ${p95} ms is not under ${MAX_P95_MS} ms`)
   const pending2 = Number(await page.getByTestId('pending').textContent())
   if (pending2 !== 5 + 334 * 3) fail(`expected ${5 + 334 * 3} unsent operations, got ${pending2}`)
 

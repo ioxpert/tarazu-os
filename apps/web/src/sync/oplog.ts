@@ -18,8 +18,6 @@ export interface PayloadByEntity {
   order_transition: S['OrderTransitionPayload']
   payment: S['PaymentPayload']
   khata_entry: S['KhataEntryPayload']
-  shift: S['ShiftPayload']
-  shift_close: S['ShiftClosePayload']
 }
 export type EntityType = keyof PayloadByEntity
 export type OpType = S['Operation']['opType']
@@ -94,21 +92,11 @@ export class OpLogWriter {
   }
 
   /** Several ops (e.g. invoice + stock movements + khata entry) in one atomic local transaction. */
-  writeAll(items: WriteItem[]): Promise<WrittenOp[]> {
-    return this.writeAllWith(async () => items)
-  }
-
-  /**
-   * Like writeAll, but the items are built INSIDE the transaction, after it has the write lock. Use it when the
-   * payload depends on local state that must not race: the next invoice number, a stock check, a cumulative
-   * return quantity. If `build` throws, nothing is written (and no number is consumed).
-   */
-  async writeAllWith(build: (tx: SyncTx) => Promise<WriteItem[]>): Promise<WrittenOp[]> {
+  async writeAll(items: WriteItem[]): Promise<WrittenOp[]> {
+    if (items.length === 0) return []
     const { deviceId, storeId } = this.identity
     const node = nodeIdOf(deviceId)
     return this.db.writeTransaction(async (tx) => {
-      const items = await build(tx)
-      if (items.length === 0) return []
       const state = await tx.getAll<{ id: string; value: string }>(
         'SELECT id, value FROM device_state WHERE id IN (?, ?)',
         [KEY_NEXT_SEQ, KEY_LAST_HLC],
@@ -148,8 +136,13 @@ export class OpLogWriter {
         seq++
       }
 
-      await tx.execute('INSERT OR REPLACE INTO device_state (id, value) VALUES (?, ?)', [KEY_NEXT_SEQ, String(seq)])
-      await tx.execute('INSERT OR REPLACE INTO device_state (id, value) VALUES (?, ?)', [KEY_LAST_HLC, format(hlc!)])
+      // one statement: every round trip to the database worker costs on a cheap Android phone
+      await tx.execute('INSERT OR REPLACE INTO device_state (id, value) VALUES (?, ?), (?, ?)', [
+        KEY_NEXT_SEQ,
+        String(seq),
+        KEY_LAST_HLC,
+        format(hlc!),
+      ])
       return written
     })
   }

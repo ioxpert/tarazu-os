@@ -38,15 +38,6 @@ export const READ_MODEL_TABLES = {
     sku: column.text,
     hsn: column.text,
     unit: column.text,
-    local_name: column.text,
-    brand: column.text,
-    category: column.text,
-    pack_sku: column.text,
-    uom: column.text, // JSON text, see UomSpec in the contract
-    tax_inclusive: column.integer,
-    tax_rate_bp: column.integer,
-    loose: column.integer,
-    pinned: column.integer,
     active: column.integer,
     updated_at: column.text,
   }),
@@ -64,7 +55,6 @@ export const READ_MODEL_TABLES = {
   price_version: new Table({
     tenant_id: column.text,
     product_id: column.text,
-    party_id: column.text,
     price_type: column.text,
     amount_paise: column.integer,
     effective_from: column.text,
@@ -117,38 +107,6 @@ export const READ_MODEL_TABLES = {
     tax_paise: column.integer,
     line_total_paise: column.integer,
   }),
-  credit_note: new Table({
-    tenant_id: column.text,
-    store_id: column.text,
-    device_id: column.text,
-    series: column.text,
-    number: column.integer,
-    invoice_id: column.text,
-    party_id: column.text,
-    reason: column.text,
-    total_paise: column.integer,
-    lines: column.text, // JSON text
-    hlc: column.text,
-    created_at: column.text,
-  }),
-  shift: new Table({
-    tenant_id: column.text,
-    store_id: column.text,
-    device_id: column.text,
-    opening_cash_paise: column.integer,
-    opened_at: column.text,
-  }),
-  // id = shift_id
-  shift_close: new Table({
-    tenant_id: column.text,
-    store_id: column.text,
-    device_id: column.text,
-    shift_id: column.text,
-    declared_cash_paise: column.integer,
-    expected_cash_paise: column.integer,
-    variance_paise: column.integer,
-    closed_at: column.text,
-  }),
   payment: new Table({
     tenant_id: column.text,
     store_id: column.text,
@@ -195,30 +153,9 @@ const opIssue = new Table(
   { localOnly: true },
 )
 
-/** Bills parked with "hold". Drafts never leave the device: only a finalised invoice is an operation. */
-const heldBill = new Table(
-  { label: column.text, cart: column.text, total_paise: column.integer, created_at: column.text },
-  { localOnly: true },
-)
-
-/** Owner PIN verifiers cached from GET /v1/identity/approvers so an approval can be checked offline (ADR 0005). */
-const approver = new Table(
-  { display_name: column.text, pin_salt: column.text, pin_hash: column.text, iterations: column.integer, fetched_at: column.text },
-  { localOnly: true },
-)
-
-/** Receipts waiting to be shared (WhatsApp) until the device is online and the user taps send. */
-const shareQueue = new Table(
-  { invoice_id: column.text, phone: column.text, body: column.text, created_at: column.text, sent_at: column.text },
-  { localOnly: true },
-)
-
 export const schema = new Schema({
   op_log: opLog,
   ...READ_MODEL_TABLES,
   device_state: deviceState,
   op_issue: opIssue,
-  held_bill: heldBill,
-  approver,
-  share_queue: shareQueue,
 })

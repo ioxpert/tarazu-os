@@ -1,0 +1,64 @@
+import { useEffect, useState } from 'react'
+import { fetchApiHealth } from './lib/health'
+import { requestPersistence, type StorageStatus } from './lib/storage'
+
+function useOnline() {
+  const [online, setOnline] = useState(() => navigator.onLine)
+  useEffect(() => {
+    const on = () => setOnline(true)
+    const off = () => setOnline(false)
+    window.addEventListener('online', on)
+    window.addEventListener('offline', off)
+    return () => {
+      window.removeEventListener('online', on)
+      window.removeEventListener('offline', off)
+    }
+  }, [])
+  return online
+}
+
+export function App() {
+  const online = useOnline()
+  const [storage, setStorage] = useState<StorageStatus | null>(null)
+  const [api, setApi] = useState<'checking' | 'up' | 'down'>('checking')
+
+  useEffect(() => {
+    void requestPersistence().then(setStorage)
+  }, [])
+
+  useEffect(() => {
+    if (!online) return
+    const ctrl = new AbortController()
+    fetchApiHealth(ctrl.signal)
+      .then((status) => setApi(status === 'UP' ? 'up' : 'down'))
+      .catch(() => setApi('down'))
+    return () => ctrl.abort()
+  }, [online])
+
+  return (
+    <main className="shell">
+      <h1>Tarazu OS</h1>
+      <p className="tagline">Billing, stock and khata that keep working offline.</p>
+      <ul className="status" aria-label="System status">
+        <li data-ok={online}>
+          Network: <strong>{online ? 'online' : 'offline (billing keeps working)'}</strong>
+        </li>
+        <li data-ok={storage?.persisted ?? false}>
+          Local storage:{' '}
+          <strong>
+            {storage === null
+              ? 'checking'
+              : !storage.supported
+                ? 'unsupported browser, use Chrome or Edge'
+                : storage.persisted
+                  ? `persistent (${storage.usageMb} MB of ${storage.quotaMb} MB)`
+                  : 'not persistent, install the app to protect data'}
+          </strong>
+        </li>
+        <li data-ok={api === 'up'}>
+          Server: <strong>{!online ? 'unreachable (offline)' : api}</strong>
+        </li>
+      </ul>
+    </main>
+  )
+}

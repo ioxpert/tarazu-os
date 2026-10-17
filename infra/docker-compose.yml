@@ -1,0 +1,20 @@
+# Local dev dependencies. Start: docker compose -f infra/docker-compose.yml up -d
+# PowerSync is intentionally NOT here yet: its config and sync rules come with the sync spike PR,
+# after the OPFS / multi-tab spike confirms the web SDK path (see docs/adr/0001).
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  pgdata:

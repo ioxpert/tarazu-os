@@ -28,3 +28,32 @@ export function adjustKhataBalance(tenantId: string, partyId: string, deltaPaise
     params: [partyId, tenantId, partyId, partyId, deltaPaise, partyId],
   }
 }
+
+export interface KhataEntryRow {
+  id: string
+  tenantId: string
+  storeId: string
+  partyId: string
+  direction: 'debit' | 'credit'
+  amountPaise: number
+  refType: string | null
+  refId: string | null
+  note: string | null
+  occurredAt: string
+}
+
+/**
+ * Everything the local read model needs for one khata_entry op: the statement row (same id as the op's entity, so the
+ * server's row replaces it after sync) and the running balance. Keeps the two from drifting apart.
+ */
+export function khataEntryEffects(e: KhataEntryRow): LocalEffect[] {
+  const delta = e.direction === 'debit' ? e.amountPaise : -e.amountPaise
+  return [
+    adjustKhataBalance(e.tenantId, e.partyId, delta),
+    {
+      sql: `INSERT OR REPLACE INTO khata_entry (id, tenant_id, store_id, party_id, direction, amount_paise, ref_type, ref_id, note, occurred_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      params: [e.id, e.tenantId, e.storeId, e.partyId, e.direction, e.amountPaise, e.refType, e.refId, e.note, e.occurredAt],
+    },
+  ]
+}

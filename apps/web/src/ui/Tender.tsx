@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { priceCart } from '../billing/calc'
 import { commitSale } from '../billing/commit'
@@ -14,6 +14,7 @@ import { Banner, Button, Header, Keypad, Screen } from './components'
 import { ApprovalModal, errorText, QrSvg, todayIst, type ApprovalResult, nowMs, perfStart } from './common'
 import { CustomerPicker } from './CustomerPicker'
 import { navigate } from './router'
+import { checkCreditLimit, loadCreditPosition, type CreditCheck } from '../khata/ledger'
 import { saveLastReceipt } from './receiptStore'
 
 type Active = TenderMode
@@ -43,6 +44,13 @@ export default function TenderScreen() {
   const [approval, setApproval] = useState<ApprovalResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [position, setPosition] = useState<{ balancePaise: number; limitPaise: number | null } | null>(null)
+
+  const customerId = bill.customer?.id ?? null
+  useEffect(() => {
+    setPosition(null)
+    if (app.db && customerId) void loadCreditPosition(app.db, customerId).then(setPosition)
+  }, [app.db, customerId])
 
   const onDate = todayIst()
   const priced = useMemo(() => {
@@ -77,6 +85,7 @@ export default function TenderScreen() {
   const left = Math.max(0, total - received)
   const change = Math.max(0, received - total)
 
+  const creditCheck: CreditCheck | null = position && explicit('credit') > 0 ? checkCreditLimit(position.balancePaise, position.limitPaise, explicit('credit')) : null
   const discountEval = evaluateDiscount(priced, app.policy)
   const needsDiscountApproval = discountEval.needsApproval && !approval
 
@@ -201,6 +210,15 @@ export default function TenderScreen() {
           <Banner kind="warning">
             <div>{t('tender.creditNeedsCustomer')}</div>
             <Button onClick={() => setPickCustomer(true)} data-testid="choose-customer">{t('tender.chooseCustomer')}</Button>
+          </Banner>
+        )}
+        {creditCheck && (creditCheck.state === 'will_exceed' || creditCheck.state === 'already_over') && (
+          <Banner kind="warning">
+            <span data-testid="credit-limit-warning">
+              {creditCheck.state === 'already_over'
+                ? t('tender.alreadyOverLimit', { name: bill.customer!.name, limit: formatRupees(creditCheck.limitPaise!, { paise: 'auto' }) })
+                : t('tender.willExceedLimit', { name: bill.customer!.name, limit: formatRupees(creditCheck.limitPaise!, { paise: 'auto' }), after: formatRupees(creditCheck.afterPaise, { paise: 'auto' }) })}
+            </span>
           </Banner>
         )}
         {explicit('credit') > 0 && bill.customer && <div className="badge badge-warn" data-testid="owes-note">{t('tender.customerOwes', { name: bill.customer.name, amount: formatRupees(explicit('credit')) })}</div>}

@@ -1,5 +1,5 @@
 import type { components } from '../api/schema'
-import { adjustKhataBalance, adjustStockBalance } from '../sync/effects'
+import { adjustStockBalance, khataEntryEffects } from '../sync/effects'
 import { item, type OpLogWriter, type WriteItem } from '../sync/oplog'
 import type { LocalDb } from '../sync/schemaDb'
 import { uuidv7 } from '../sync/uuid7'
@@ -277,16 +277,17 @@ export async function commitSale(writer: OpLogWriter, db: Pick<LocalDb, 'getAll'
     }
 
     if (settlement.creditPaise > 0 && partyId !== null) {
+      const khataId = uuidv7(nowMs)
       items.push(
         item(
           {
             entityType: 'khata_entry',
-            entityId: uuidv7(nowMs),
+            entityId: khataId,
             opType: 'create',
             actorUserId: input.actorUserId,
             payload: { partyId, direction: 'debit', amountPaise: settlement.creditPaise, refType: 'invoice', refId: invoiceId, occurredAt: issuedAtIso },
           },
-          [adjustKhataBalance(tenantId, partyId, settlement.creditPaise)],
+          khataEntryEffects({ id: khataId, tenantId, storeId, partyId, direction: 'debit', amountPaise: settlement.creditPaise, refType: 'invoice', refId: invoiceId, note: null, occurredAt: issuedAtIso }),
         ),
       )
     }

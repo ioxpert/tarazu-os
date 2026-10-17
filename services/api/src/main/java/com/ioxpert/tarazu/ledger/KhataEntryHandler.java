@@ -78,6 +78,31 @@ class KhataEntryHandler implements EntityOperationHandler {
 				.param("hlc", op.hlc().raw()).param("op", op.operationId())
 				.param("at", java.sql.Timestamp.from(p.has("occurredAt") ? p.instant("occurredAt") : op.hlc().instant()))
 				.update();
+		evaluateCreditLimit(ctx, party);
 		return HandlerResult.applied();
+	}
+
+	/**
+	 * A credit limit is advice, never a refusal: the sale already happened. While the party's balance is above its
+	 * limit one open `credit_limit_exceeded` flag exists; it closes when the balance is back at or below it (or the
+	 * limit is removed). State-based, so the end state does not depend on the order entries arrived in.
+	 */
+	private void evaluateCreditLimit(OperationContext ctx, java.util.UUID party) {
+		var row = jdbc.sql("""
+				SELECT p.credit_limit_paise AS lim, coalesce(b.balance_paise, 0) AS bal
+				FROM party p LEFT JOIN khata_balance b ON b.party_id = p.id WHERE p.id = :id
+				""").param("id", party).query((rs, n) -> new long[] { rs.getLong("lim"), rs.wasNull() ? 1 : 0, rs.getLong("bal") })
+				.optional().orElse(null);
+		if (row == null) {
+			return;
+		}
+		boolean hasLimit = row[1] == 0;
+		if (hasLimit && row[2] > row[0]) {
+			ctx.flag("credit_limit_exceeded", party.toString(), "party", party,
+					java.util.Map.of("creditLimitPaise", row[0], "balancePaise", row[2]));
+		}
+		else {
+			ctx.resolveFlag("credit_limit_exceeded", party.toString(), "Balance is within the credit limit");
+		}
 	}
 }

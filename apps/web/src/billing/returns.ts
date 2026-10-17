@@ -1,6 +1,6 @@
 import type { components } from '../api/schema'
 import type { Unit } from '../catalogue/types'
-import { adjustKhataBalance, adjustStockBalance } from '../sync/effects'
+import { khataEntryEffects, adjustStockBalance } from '../sync/effects'
 import { item, type OpLogWriter, type WriteItem } from '../sync/oplog'
 import { uuidv7 } from '../sync/uuid7'
 import { taxBreakup } from './calc'
@@ -435,16 +435,17 @@ export async function commitReturn(writer: OpLogWriter, db: StateReader, input: 
     }
     for (const r of input.refunds) {
       if (r.kind === 'khata') {
+        const khataId = uuidv7(nowMs)
         items.push(
           item(
             {
               entityType: 'khata_entry',
-              entityId: uuidv7(nowMs),
+              entityId: khataId,
               opType: 'create',
               actorUserId: input.actorUserId,
               payload: { partyId: invoice.partyId!, direction: 'credit', amountPaise: r.amountPaise, refType: 'credit_note', refId: creditNoteId, occurredAt: issuedAtIso },
             },
-            [adjustKhataBalance(tenantId, invoice.partyId!, -r.amountPaise)],
+            khataEntryEffects({ id: khataId, tenantId, storeId, partyId: invoice.partyId!, direction: 'credit', amountPaise: r.amountPaise, refType: 'credit_note', refId: creditNoteId, note: null, occurredAt: issuedAtIso }),
           ),
         )
         continue

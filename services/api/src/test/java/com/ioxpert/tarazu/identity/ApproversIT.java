@@ -65,7 +65,7 @@ class ApproversIT extends ApiIT {
 	@Test
 	void theReturnedVerifierIsPbkdf2HmacSha256OfTheUtf8PinWithTheReturnedSaltAndIterations() throws Exception {
 		Seed seed = seedTenant();
-		setPin(seed, seed.owner(), "4821");
+		setPin(seed, seed.owner(), "482100");
 		String token = registerDevice(seed);
 
 		JsonNode list = approvers(token);
@@ -80,21 +80,21 @@ class ApproversIT extends ApiIT {
 		byte[] hash = Base64.getDecoder().decode(a.get("pinHash").asString());
 		assertThat(salt).hasSize(16);
 		assertThat(hash).as("256-bit key").hasSize(32);
-		assertThat(pbkdf2("4821", salt, iterations)).isEqualTo(a.get("pinHash").asString());
-		assertThat(pbkdf2("4822", salt, iterations)).isNotEqualTo(a.get("pinHash").asString());
+		assertThat(pbkdf2("482100", salt, iterations)).isEqualTo(a.get("pinHash").asString());
+		assertThat(pbkdf2("482101", salt, iterations)).isNotEqualTo(a.get("pinHash").asString());
 		assertThat(Base64.getEncoder().encodeToString(salt)).as("canonical standard base64, not url-safe").isEqualTo(a.get("pinSalt").asString());
-		assertThat("4821".getBytes(StandardCharsets.UTF_8)).hasSize(4);
+		assertThat("482100".getBytes(StandardCharsets.UTF_8)).hasSize(6);
 	}
 
 	@Test
 	void onlyActiveOwnersWithAPinAreReturned() throws Exception {
 		Seed seed = seedTenant();
-		setPin(seed, seed.owner(), "1111");
+		setPin(seed, seed.owner(), "111111");
 		UUID noPin = addOwner(seed, "Owner without PIN");
 		UUID second = addOwner(seed, "Second owner");
-		setPin(seed, second, "2222");
+		setPin(seed, second, "222222");
 		UUID disabled = addOwner(seed, "Disabled owner");
-		setPin(seed, disabled, "3333");
+		setPin(seed, disabled, "333333");
 		UUID cashier = addUser(seed, "cashier");
 		setPin(seed, cashier, "4444");
 		UUID manager = addUser(seed, "manager");
@@ -118,8 +118,8 @@ class ApproversIT extends ApiIT {
 			jdbc.update("INSERT INTO store (id, tenant_id, business_id, name) VALUES (?, ?, ?, 'Branch')", elsewhere, seed.tenant(), seed.business());
 			return jdbc.update("INSERT INTO user_role (tenant_id, user_id, role, store_id) VALUES (?, ?, 'owner', ?)", seed.tenant(), branchOwner, elsewhere);
 		});
-		setPin(seed, branchOwner, "6666");
-		setPin(seed, seed.owner(), "1111");
+		setPin(seed, branchOwner, "666666");
+		setPin(seed, seed.owner(), "111111");
 		JsonNode list = approvers(registerDevice(seed));
 		assertThat(list.size()).isEqualTo(1);
 		assertThat(list.get(0).get("userId").asString()).isEqualTo(seed.owner().toString());
@@ -129,8 +129,8 @@ class ApproversIT extends ApiIT {
 	void tenantsAreIsolated() throws Exception {
 		Seed a = seedTenant();
 		Seed b = seedTenant();
-		setPin(a, a.owner(), "1111");
-		setPin(b, b.owner(), "2222");
+		setPin(a, a.owner(), "111111");
+		setPin(b, b.owner(), "222222");
 		JsonNode forA = approvers(registerDevice(a));
 		assertThat(forA.size()).isEqualTo(1);
 		assertThat(forA.get(0).get("userId").asString()).isEqualTo(a.owner().toString());
@@ -142,7 +142,7 @@ class ApproversIT extends ApiIT {
 	@Test
 	void aRequestWithoutADeviceCredentialNeverGetsTheVerifiers() throws Exception {
 		Seed seed = seedTenant();
-		setPin(seed, seed.owner(), "1111");
+		setPin(seed, seed.owner(), "111111");
 		mvc.perform(get("/v1/identity/approvers")).andExpect(status().isUnauthorized());
 		// the dev tenant header (even with the owner identified) is a tenant-level principal, not a device
 		mvc.perform(get("/v1/identity/approvers").header("X-Tenant-Id", seed.tenant()))
@@ -155,7 +155,7 @@ class ApproversIT extends ApiIT {
 	@Test
 	void aRevokedDeviceGetsNoVerifiers() throws Exception {
 		Seed seed = seedTenant();
-		setPin(seed, seed.owner(), "1111");
+		setPin(seed, seed.owner(), "111111");
 		UUID device = UUID.randomUUID();
 		var res = mvc.perform(asOwner(put("/v1/identity/devices/" + device), seed)
 				.content(json.writeValueAsString(Map.of("storeId", seed.store())))).andReturn();
@@ -206,5 +206,26 @@ class ApproversIT extends ApiIT {
 		mvc.perform(asOwner(put(path), seed).content(json.writeValueAsString(Map.of("name", "K", "gstMode", "non_gst")))).andExpect(status().isOk())
 				.andExpect(jsonPath("$.upiVpa").doesNotExist());
 		assertThat(count(seed, "SELECT count(*) FROM audit_log WHERE action = 'business.upi_vpa_set' AND entity_id = ?", seed.business())).isEqualTo(2);
+	}
+
+	@Test
+	void ownerPinsNeedSixDigitsOthersMayUseFour() throws Exception {
+		Seed seed = seedTenant();
+		UUID cashier = addUser(seed, "cashier");
+		mvc.perform(asOwner(put("/v1/identity/users/" + seed.owner() + "/pin"), seed)
+				.content(json.writeValueAsString(Map.of("pin", "4821", "reason", "short")))).andExpect(status().isUnprocessableEntity())
+				.andExpect(jsonPath("$.code").value("owner_pin_too_short"));
+		setPin(seed, seed.owner(), "482100");
+		setPin(seed, cashier, "4821");
+	}
+
+	@Test
+	void everyVerifierFetchIsAuditedWithTheDevice() throws Exception {
+		Seed seed = seedTenant();
+		setPin(seed, seed.owner(), "482100");
+		String token = registerDevice(seed);
+		approvers(token);
+		approvers(token);
+		assertThat(count(seed, "SELECT count(*) FROM audit_log WHERE action = 'approvers.fetched' AND actor_device_id IS NOT NULL")).isEqualTo(2);
 	}
 }

@@ -664,7 +664,7 @@ paths:
   /v1/identity/users/{id}/pin:
     put:
       operationId: putUserPin
-      summary: Set a staff member's PIN (4-8 digits)
+      summary: Set a staff member's PIN (4-8 digits; an owner's PIN needs at least 6, else 422 owner_pin_too_short)
       tags: [identity]
       parameters:
         - $ref: '#/components/parameters/Id'
@@ -686,6 +686,8 @@ paths:
         '403':
           $ref: '#/components/responses/Problem'
         '404':
+          $ref: '#/components/responses/Problem'
+        '422':
           $ref: '#/components/responses/Problem'
   /v1/identity/users/{id}/pin/verify:
     post:

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { verifyOwnerPin } from '../billing/approvals'
+import { verifyOwnerPinGuarded } from '../billing/approvals'
 import { BillingError } from '../billing/errors'
 import { istDate } from '../billing/numbering'
 import { attachWedgeScanner } from '../catalogue/scanner'
@@ -77,13 +77,13 @@ export function ApprovalModal({
   const { t } = useTranslation()
   const [pin, setPin] = useState('')
   const [reason, setReason] = useState(defaultReason)
-  const [problem, setProblem] = useState<'wrong_pin' | 'no_approvers_cached' | 'reason' | null>(null)
+  const [problem, setProblem] = useState<'wrong_pin' | 'no_approvers_cached' | 'locked' | 'approvers_stale' | 'reason' | null>(null)
   const [busy, setBusy] = useState(false)
 
   const submit = async () => {
     if (!reason.trim()) return setProblem('reason')
     setBusy(true)
-    const r = await verifyOwnerPin(db, null, pin)
+    const r = await verifyOwnerPinGuarded(db, null, pin)
     setBusy(false)
     if (r.ok) onApproved({ approverUserId: r.approverUserId, reason: reason.trim() })
     else {
@@ -110,6 +110,8 @@ export function ApprovalModal({
         <Banner kind="error">
           {problem === 'wrong_pin' && t('approval.wrongPin')}
           {problem === 'no_approvers_cached' && t('approval.noApprovers')}
+          {problem === 'locked' && t('approval.locked')}
+          {problem === 'approvers_stale' && t('approval.stale')}
           {problem === 'reason' && t('approval.reasonNeeded')}
         </Banner>
       )}

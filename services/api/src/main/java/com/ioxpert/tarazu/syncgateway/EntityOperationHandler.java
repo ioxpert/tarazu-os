@@ -23,5 +23,29 @@ public interface EntityOperationHandler {
 		return Set.of();
 	}
 
+	/**
+	 * Whether other operations can depend on entities of this type (ctx.require). Pure events nobody references
+	 * (stock movements, khata entries, payments, ...) return false and skip registry bookkeeping, which is the
+	 * bulk of all traffic. The safe default is true.
+	 */
+	default boolean registersEntity() {
+		return true;
+	}
+
+	/**
+	 * Lock-ordering hint for hot-row handlers. Operations of handlers returning a tier of 0 or more are applied
+	 * after all the others, sorted by (lockTier, lockKey, localSeq), so concurrent batches that touch the same hot
+	 * rows (stock of one product, one party's khata) take row locks in one global order and cannot deadlock each
+	 * other. Everything else keeps the client's order, which matters for "first wins" rules (invoice numbers) and
+	 * state machines (order transitions). Order never affects the final projections: they are sums.
+	 */
+	default int lockTier() {
+		return -1;
+	}
+
+	default String lockKey(Operation op) {
+		return op.entityId().toString();
+	}
+
 	HandlerResult handle(Operation op, OperationContext ctx);
 }

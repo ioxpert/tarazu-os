@@ -25,6 +25,11 @@ class KhataEntryHandler implements EntityOperationHandler {
 	}
 
 	@Override
+	public boolean registersEntity() {
+		return false;
+	}
+
+	@Override
 	public String entityType() {
 		return "khata_entry";
 	}
@@ -32,6 +37,17 @@ class KhataEntryHandler implements EntityOperationHandler {
 	@Override
 	public Set<Permission> permissions(Operation op) {
 		return Set.of(Permission.RECORD_PAYMENT, Permission.RECORD_SALE, Permission.ISSUE_CREDIT_NOTE);
+	}
+
+	@Override
+	public int lockTier() {
+		return 80;
+	}
+
+	/** Entries for one party contend for the same khata_balance row. */
+	@Override
+	public String lockKey(Operation op) {
+		return op.payload().node().path("partyId").asString("");
 	}
 
 	@Override

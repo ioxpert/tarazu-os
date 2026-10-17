@@ -41,11 +41,29 @@ class UserService {
 		this.verifier = verifier;
 	}
 
+	/** Owners are managed by owners: a manager must not reset an owner's PIN, disable them or rewrite their roles. */
+	private void requireOwnerToTouchOwner(UUID target) {
+		if (TenantContext.principal().hasRole("owner")) {
+			return;
+		}
+		if (access.rolesOf(target).contains("owner")) {
+			throw ApiException.forbidden("owner_only", "Only an owner can change an owner account");
+		}
+	}
+
+	/** Serialises owner-count changes so two owners cannot disable each other at the same time. */
+	private void lockOwners() {
+		jdbc.sql("SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))) l")
+				.param("k", TenantContext.require().value() + "/owners").query(Integer.class).single();
+	}
+
 	@Transactional
 	UserView upsert(UUID id, String displayName, String phone, String status) {
 		tenantSession.bindCurrentTenant();
 		access.require(Permission.USER_MANAGE);
 		var tenant = TenantContext.require().value();
+		requireOwnerToTouchOwner(id);
+		lockOwners();
 		long ownersBefore = activeOwners();
 		try {
 			jdbc.sql("""
@@ -72,6 +90,8 @@ class UserService {
 		access.require(Permission.USER_MANAGE);
 		var principal = TenantContext.principal();
 		requireExists(userId);
+		requireOwnerToTouchOwner(userId);
+		lockOwners();
 		Set<String> before = rolesOfAnyScope(userId);
 		Set<String> after = grants.stream().map(RoleGrant::role).collect(Collectors.toSet());
 		boolean touchesOwner = before.contains("owner") != after.contains("owner");
@@ -104,6 +124,7 @@ class UserService {
 		tenantSession.bindCurrentTenant();
 		access.require(Permission.USER_MANAGE);
 		requireExists(userId);
+		requireOwnerToTouchOwner(userId);
 		var hashed = hasher.hash(pin);
 		jdbc.sql("""
 				UPDATE app_user SET pin_salt = :salt, pin_hash = :hash, pin_iterations = :iter, pin_set_at = now(),

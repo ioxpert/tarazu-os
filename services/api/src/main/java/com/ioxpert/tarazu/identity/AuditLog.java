@@ -44,8 +44,11 @@ public class AuditLog {
 	/** Requires a tenant-bound transaction. Missing actor fields default to the current principal. */
 	public void record(Entry entry) {
 		var principal = TenantContext.principal();
-		UUID user = entry.actorUserId() != null ? entry.actorUserId() : principal.userId();
-		UUID device = entry.actorDeviceId() != null ? entry.actorDeviceId() : principal.deviceId();
+		// an entry for a synced operation names the op's own actor; falling back to the request's principal would
+		// blame whoever's upload happened to wake a parked operation
+		boolean synced = entry.operationId() != null;
+		UUID user = entry.actorUserId() != null || synced ? entry.actorUserId() : principal.userId();
+		UUID device = entry.actorDeviceId() != null || synced ? entry.actorDeviceId() : principal.deviceId();
 		jdbc.sql("""
 				INSERT INTO audit_log (id, tenant_id, actor_user_id, actor_device_id, action, entity_type, entity_id,
 				                       reason, details, operation_id)

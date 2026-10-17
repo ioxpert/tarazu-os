@@ -79,7 +79,7 @@ public final class Ops {
 	}
 
 	public Map<String, Object> product(UUID id, String name) {
-		return create("product", id, Map.of("name", name, "unit", "pcs"));
+		return create("product", id, Map.of("name", name, "unit", "piece"));
 	}
 
 	public Map<String, Object> party(UUID id, String name) {

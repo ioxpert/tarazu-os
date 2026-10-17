@@ -20,6 +20,18 @@ final class FieldMerge {
 	private FieldMerge() {
 	}
 
+	/** A jsonb column value (text may be null for SQL NULL). Merged by HLC like any other field. */
+	record Jsonb(String text) {
+	}
+
+	private static String placeholder(String name, Object value) {
+		return value instanceof Jsonb ? "CAST(:" + name + " AS jsonb)" : ":" + name;
+	}
+
+	private static Object bound(Object value) {
+		return value instanceof Jsonb j ? j.text() : value;
+	}
+
 	/** Creates the row, or merges into it if it already exists (e.g. a replayed create from another op id). */
 	static void upsert(JdbcClient jdbc, JsonMapper json, String table, Operation op, Map<String, Object> fields) {
 		Map<String, Object> clock = new LinkedHashMap<>();
@@ -28,13 +40,13 @@ final class FieldMerge {
 		StringBuilder vals = new StringBuilder(":id, :tenant, CAST(:clock AS jsonb)");
 		for (String f : fields.keySet()) {
 			cols.append(", ").append(f);
-			vals.append(", :f_").append(f);
+			vals.append(", ").append(placeholder("f_" + f, fields.get(f)));
 		}
 		var stmt = jdbc.sql("INSERT INTO " + table + " (" + cols + ") VALUES (" + vals + ") ON CONFLICT (tenant_id, id) DO NOTHING")
 				.param("id", op.entityId()).param("tenant", op.tenantId())
 				.param("clock", json.writeValueAsString(clock));
 		for (var e : fields.entrySet()) {
-			stmt = stmt.param("f_" + e.getKey(), e.getValue());
+			stmt = stmt.param("f_" + e.getKey(), bound(e.getValue()));
 		}
 		if (stmt.update() == 0) {
 			merge(jdbc, json, table, op, fields);
@@ -57,8 +69,8 @@ final class FieldMerge {
 			if (stored != null && Hlc.parse((String) stored).compareTo(op.hlc()) >= 0) {
 				continue; // a newer (or identical) write already set this field
 			}
-			set.append(e.getKey()).append(" = :f_").append(e.getKey()).append(", ");
-			params.put("f_" + e.getKey(), e.getValue());
+			set.append(e.getKey()).append(" = ").append(placeholder("f_" + e.getKey(), e.getValue())).append(", ");
+			params.put("f_" + e.getKey(), bound(e.getValue()));
 			clock.put(e.getKey(), op.hlc().raw());
 		}
 		if (params.isEmpty()) {

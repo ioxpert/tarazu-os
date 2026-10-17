@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 class OrgService {
 
-	record BusinessView(UUID id, String name, String gstMode, String gstin, String stateCode) {
+	record BusinessView(UUID id, String name, String gstMode, String gstin, String stateCode, String upiVpa) {
 	}
 
 	record StoreView(UUID id, UUID businessId, String name) {
@@ -34,29 +34,37 @@ class OrgService {
 	}
 
 	@Transactional
-	BusinessView upsertBusiness(UUID id, String name, String gstMode, String gstin, String stateCode) {
+	BusinessView upsertBusiness(UUID id, String name, String gstMode, String gstin, String stateCode, String upiVpa) {
 		tenantSession.bindCurrentTenant();
 		access.require(Permission.SETTINGS_MANAGE);
 		var tenant = TenantContext.require().value();
-		String before = jdbc.sql("SELECT gst_mode FROM business WHERE id = :id").param("id", id)
-				.query(String.class).optional().orElse(null);
+		record Before(String gstMode, String upiVpa) {
+		}
+		Before before = jdbc.sql("SELECT gst_mode, upi_vpa FROM business WHERE id = :id").param("id", id)
+				.query((rs, n) -> new Before(rs.getString("gst_mode"), rs.getString("upi_vpa"))).optional().orElse(null);
 		try {
 			jdbc.sql("""
-					INSERT INTO business (id, tenant_id, name, gst_mode, gstin, state_code)
-					VALUES (:id, :tenant, :name, :mode, :gstin, :state)
+					INSERT INTO business (id, tenant_id, name, gst_mode, gstin, state_code, upi_vpa)
+					VALUES (:id, :tenant, :name, :mode, :gstin, :state, :upi)
 					ON CONFLICT (tenant_id, id) DO UPDATE SET name = EXCLUDED.name, gst_mode = EXCLUDED.gst_mode,
-					       gstin = EXCLUDED.gstin, state_code = EXCLUDED.state_code
+					       gstin = EXCLUDED.gstin, state_code = EXCLUDED.state_code, upi_vpa = EXCLUDED.upi_vpa
 					""").param("id", id).param("tenant", tenant).param("name", name).param("mode", gstMode)
-					.param("gstin", gstin).param("state", stateCode).update();
+					.param("gstin", gstin).param("state", stateCode).param("upi", upiVpa).update();
 		}
 		catch (DataIntegrityViolationException ex) {
 			throw ApiException.conflict("id_conflict", "Business id is not available");
 		}
-		if (before == null || !before.equals(gstMode)) {
+		if (before == null || !before.gstMode().equals(gstMode)) {
 			audit.record(AuditLog.Entry.of("business.gst_mode_set", "business", id, null)
-					.withDetails(Map.of("from", String.valueOf(before), "to", gstMode)));
+					.withDetails(Map.of("from", before == null ? "null" : before.gstMode(), "to", gstMode)));
 		}
-		return new BusinessView(id, name, gstMode, gstin, stateCode);
+		// Payments are collected on this address (printed on receipts, encoded in the QR): every change is audited.
+		String vpaBefore = before == null ? null : before.upiVpa();
+		if (!java.util.Objects.equals(vpaBefore, upiVpa)) {
+			audit.record(AuditLog.Entry.of("business.upi_vpa_set", "business", id, null)
+					.withDetails(Map.of("from", String.valueOf(vpaBefore), "to", String.valueOf(upiVpa))));
+		}
+		return new BusinessView(id, name, gstMode, gstin, stateCode, upiVpa);
 	}
 
 	@Transactional
@@ -76,5 +84,21 @@ class OrgService {
 			throw ApiException.unprocessable("unknown_business", "Business does not exist for this tenant");
 		}
 		return new StoreView(id, businessId, name);
+	}
+
+	/** The store the device belongs to and its business, for GET /me. Requires a bound tenant. */
+	record StoreContext(String storeName, BusinessView business) {
+	}
+
+	java.util.Optional<StoreContext> storeContext(UUID storeId) {
+		return jdbc.sql("""
+				SELECT s.name AS store_name, b.id, b.name, b.gst_mode, b.gstin, b.state_code, b.upi_vpa
+				FROM store s JOIN business b ON b.tenant_id = s.tenant_id AND b.id = s.business_id
+				WHERE s.id = :store
+				""").param("store", storeId)
+				.query((rs, n) -> new StoreContext(rs.getString("store_name"), new BusinessView(
+						rs.getObject("id", UUID.class), rs.getString("name"), rs.getString("gst_mode"),
+						rs.getString("gstin"), rs.getString("state_code"), rs.getString("upi_vpa"))))
+				.optional();
 	}
 }

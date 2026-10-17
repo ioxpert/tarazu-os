@@ -33,12 +33,18 @@ import tools.jackson.databind.json.JsonMapper;
 @RequestMapping("/v1/identity")
 class IdentityController {
 
-	record MeResponse(UUID tenantId, UUID deviceId, UUID storeId, UUID userId, Set<String> roles) {
+	record MeResponse(UUID tenantId, UUID deviceId, UUID storeId, UUID userId, Set<String> roles, String storeName,
+			OrgService.BusinessView business) {
+	}
+
+	/** Owner PIN verifier; salt and hash are standard base64 (docs/adr/0005). */
+	record Approver(UUID userId, String displayName, String pinSalt, String pinHash, int iterations) {
 	}
 
 	record BusinessRequest(@NotBlank @Size(max = 200) String name,
 			@NotNull @Pattern(regexp = "regular|composition|non_gst") String gstMode,
-			@Pattern(regexp = "[0-9A-Z]{15}") String gstin, @Pattern(regexp = "[0-9]{2}") String stateCode) {
+			@Pattern(regexp = "[0-9A-Z]{15}") String gstin, @Pattern(regexp = "[0-9]{2}") String stateCode,
+			@Pattern(regexp = "[A-Za-z0-9._-]{2,256}@[A-Za-z]{2,64}") String upiVpa) {
 	}
 
 	record StoreRequest(@NotNull UUID businessId, @NotBlank @Size(max = 200) String name) {
@@ -97,14 +103,51 @@ class IdentityController {
 	}
 
 	@GetMapping("/me")
+	@Transactional(readOnly = true)
 	MeResponse me() {
 		Principal p = TenantContext.principal();
-		return new MeResponse(p.tenant().value(), p.deviceId(), p.storeId(), p.userId(), p.roles());
+		OrgService.StoreContext store = null;
+		if (p.storeId() != null) {
+			tenantSession.bindCurrentTenant();
+			store = org.storeContext(p.storeId()).orElse(null);
+		}
+		return new MeResponse(p.tenant().value(), p.deviceId(), p.storeId(), p.userId(), p.roles(),
+				store == null ? null : store.storeName(), store == null ? null : store.business());
+	}
+
+	/**
+	 * Owner PIN verifiers for offline approval (ADR 0005). Needs a DEVICE credential: a tenant-level or browser
+	 * request never receives them. Active owners (for this store) that have a PIN set; disabled users excluded.
+	 */
+	@GetMapping("/approvers")
+	@Transactional(readOnly = true)
+	List<Approver> approvers() {
+		Principal p = TenantContext.principal();
+		if (p.deviceId() == null || p.storeId() == null) {
+			throw ApiException.forbidden("device_credential_required", "Owner PIN verifiers are only served to a registered device");
+		}
+		tenantSession.bindCurrentTenant();
+		var encoder = java.util.Base64.getEncoder();
+		return jdbc.sql("""
+				SELECT u.id, u.display_name, u.pin_salt, u.pin_hash, u.pin_iterations
+				FROM app_user u
+				WHERE u.status = 'active' AND u.pin_hash IS NOT NULL AND u.pin_salt IS NOT NULL AND u.pin_iterations IS NOT NULL
+				  AND EXISTS (SELECT 1 FROM user_role r
+				              WHERE r.tenant_id = u.tenant_id AND r.user_id = u.id AND r.role = 'owner'
+				                AND (r.store_id IS NULL OR r.store_id = :store)
+				                AND (r.business_id IS NULL
+				                     OR r.business_id = (SELECT s.business_id FROM store s WHERE s.id = :store)))
+				ORDER BY u.display_name, u.id
+				""").param("store", p.storeId())
+				.query((rs, n) -> new Approver(rs.getObject("id", UUID.class), rs.getString("display_name"),
+						encoder.encodeToString(rs.getBytes("pin_salt")), encoder.encodeToString(rs.getBytes("pin_hash")),
+						rs.getInt("pin_iterations")))
+				.list();
 	}
 
 	@PutMapping("/businesses/{id}")
 	OrgService.BusinessView putBusiness(@PathVariable UUID id, @Valid @RequestBody BusinessRequest body) {
-		return org.upsertBusiness(id, body.name(), body.gstMode(), body.gstin(), body.stateCode());
+		return org.upsertBusiness(id, body.name(), body.gstMode(), body.gstin(), body.stateCode(), body.upiVpa());
 	}
 
 	@PutMapping("/stores/{id}")

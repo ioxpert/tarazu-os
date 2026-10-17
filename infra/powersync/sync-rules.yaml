@@ -11,11 +11,15 @@ bucket_definitions:
   by_merchant:
     parameters: SELECT request.jwt() ->> 'merchant_id' AS merchant_id
     data:
-      - SELECT id, tenant_id, name, barcode, sku, hsn, unit, active, updated_at
+      # uom is jsonb on the server; PowerSync would sync it as JSON text anyway, the explicit CAST documents that the
+      # client column is text (UomSpec JSON, see the contract). Booleans arrive as 0/1 integers.
+      - SELECT id, tenant_id, name, barcode, sku, hsn, unit, local_name, brand, category, pack_sku,
+               CAST(uom AS text) AS uom, tax_inclusive, tax_rate_bp, loose, pinned, active, updated_at
         FROM product WHERE tenant_id = bucket.merchant_id
       - SELECT id, tenant_id, name, party_type, phone, gstin, credit_limit_paise, active, merged_into, updated_at
         FROM party WHERE tenant_id = bucket.merchant_id
-      - SELECT id, tenant_id, product_id, price_type, amount_paise, effective_from, hlc
+      # party_id is set only for price_type 'customer' (a negotiated price for one party)
+      - SELECT id, tenant_id, product_id, party_id, price_type, amount_paise, effective_from, hlc
         FROM price_version WHERE tenant_id = bucket.merchant_id
       # projection: id = store_id:product_id
       - SELECT store_id || ':' || product_id AS id, tenant_id, store_id, product_id, qty_milli, oversold, movement_count
@@ -30,6 +34,15 @@ bucket_definitions:
       - SELECT invoice_id || ':' || line_no AS id, tenant_id, invoice_id, line_no, product_id, qty_milli,
                unit_price_paise, discount_paise, hsn, tax_rate_bp, tax_paise, line_total_paise
         FROM invoice_line WHERE tenant_id = bucket.merchant_id
+      # lines is jsonb on the server (typed credit-note lines), text on the client
+      - SELECT id, tenant_id, store_id, device_id, series, number, invoice_id, party_id, reason, total_paise,
+               CAST(lines AS text) AS lines, hlc, created_at
+        FROM credit_note WHERE tenant_id = bucket.merchant_id
+      - SELECT id, tenant_id, store_id, device_id, opening_cash_paise, opened_at
+        FROM shift WHERE tenant_id = bucket.merchant_id
+      # id = the shift_close row id (NOT shift_id: apps/web/src/sync/schema.ts has a stale comment saying shift_id)
+      - SELECT id, tenant_id, store_id, device_id, shift_id, declared_cash_paise, expected_cash_paise, variance_paise, closed_at
+        FROM shift_close WHERE tenant_id = bucket.merchant_id
       - SELECT id, tenant_id, store_id, party_id, invoice_id, direction, mode, amount_paise, reference, occurred_at
         FROM payment WHERE tenant_id = bucket.merchant_id
       - SELECT id, tenant_id, store_id, party_id, state, updated_at

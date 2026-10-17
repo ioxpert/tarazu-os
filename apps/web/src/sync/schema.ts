@@ -138,7 +138,7 @@ export const READ_MODEL_TABLES = {
     opening_cash_paise: column.integer,
     opened_at: column.text,
   }),
-  // id = shift_id
+  // id = the shift_close row's own id (one per shift)
   shift_close: new Table({
     tenant_id: column.text,
     store_id: column.text,

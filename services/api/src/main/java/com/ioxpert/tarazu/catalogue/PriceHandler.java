@@ -28,6 +28,11 @@ class PriceHandler implements EntityOperationHandler {
 	}
 
 	@Override
+	public boolean registersEntity() {
+		return false;
+	}
+
+	@Override
 	public String entityType() {
 		return "price_version";
 	}

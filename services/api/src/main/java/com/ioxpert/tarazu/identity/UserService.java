@@ -21,7 +21,7 @@ class UserService {
 	record RoleGrant(String role, UUID businessId, UUID storeId) {
 	}
 
-	record UserView(UUID id, String displayName, String phone, String status, boolean pinSet, List<RoleGrant> roles) {
+	record UserView(UUID id, String displayName, String phone, String email, String status, boolean pinSet, List<RoleGrant> roles) {
 	}
 
 	private final JdbcClient jdbc;
@@ -30,9 +30,11 @@ class UserService {
 	private final AuditLog audit;
 	private final PinHasher hasher;
 	private final PinVerifier verifier;
+	private final ContactDirectory contacts;
 
 	UserService(JdbcClient jdbc, TenantSession tenantSession, AccessPolicy access, AuditLog audit, PinHasher hasher,
-			PinVerifier verifier) {
+			PinVerifier verifier, ContactDirectory contacts) {
+		this.contacts = contacts;
 		this.jdbc = jdbc;
 		this.tenantSession = tenantSession;
 		this.access = access;
@@ -41,19 +43,57 @@ class UserService {
 		this.verifier = verifier;
 	}
 
+	/** Keeps the login directory in step with the user's contacts (only once OTP login is configured). */
+	private void syncContact(ContactDirectory.Channel channel, String old, String now, UUID tenant, UUID user) {
+		if (!contacts.configured() || java.util.Objects.equals(old, now)) {
+			return;
+		}
+		if (old != null) {
+			contacts.release(channel, old);
+		}
+		if (now != null && !contacts.register(channel, now, tenant, user)) {
+			throw ApiException.conflict("contact_in_use", "That " + channel.wire() + " already belongs to another account");
+		}
+	}
+
+	/** Owners are managed by owners: a manager must not reset an owner's PIN, disable them or rewrite their roles. */
+	private void requireOwnerToTouchOwner(UUID target) {
+		if (TenantContext.principal().hasRole("owner")) {
+			return;
+		}
+		if (access.rolesOf(target).contains("owner")) {
+			throw ApiException.forbidden("owner_only", "Only an owner can change an owner account");
+		}
+	}
+
+	/** Serialises owner-count changes so two owners cannot disable each other at the same time. */
+	private void lockOwners() {
+		jdbc.sql("SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))) l")
+				.param("k", TenantContext.require().value() + "/owners").query(Integer.class).single();
+	}
+
 	@Transactional
-	UserView upsert(UUID id, String displayName, String phone, String status) {
+	UserView upsert(UUID id, String displayName, String phone, String email, String status) {
 		tenantSession.bindCurrentTenant();
 		access.require(Permission.USER_MANAGE);
 		var tenant = TenantContext.require().value();
+		requireOwnerToTouchOwner(id);
+		lockOwners();
 		long ownersBefore = activeOwners();
+		String phoneN = phone == null || phone.isBlank() ? null : ContactDirectory.normalisePhone(phone);
+		String emailN = email == null || email.isBlank() ? null : ContactDirectory.normaliseEmail(email);
+		if ((phone != null && !phone.isBlank() && phoneN == null) || (email != null && !email.isBlank() && emailN == null)) {
+			throw ApiException.badRequest("invalid_contact", "Phone must be an Indian mobile or +country number; email must be an address");
+		}
+		var before = jdbc.sql("SELECT phone, email FROM app_user WHERE id = :id").param("id", id)
+				.query((rs, n) -> new String[] { rs.getString("phone"), rs.getString("email") }).optional().orElse(new String[2]);
 		try {
 			jdbc.sql("""
-					INSERT INTO app_user (id, tenant_id, display_name, phone, status)
-					VALUES (:id, :tenant, :name, :phone, :status)
+					INSERT INTO app_user (id, tenant_id, display_name, phone, email, status)
+					VALUES (:id, :tenant, :name, :phone, :email, :status)
 					ON CONFLICT (tenant_id, id) DO UPDATE SET display_name = EXCLUDED.display_name, phone = EXCLUDED.phone,
-					                               status = EXCLUDED.status
-					""").param("id", id).param("tenant", tenant).param("name", displayName).param("phone", phone)
+					                               email = EXCLUDED.email, status = EXCLUDED.status
+					""").param("id", id).param("tenant", tenant).param("name", displayName).param("phone", phoneN).param("email", emailN)
 					.param("status", status).update();
 		}
 		catch (DataIntegrityViolationException ex) {
@@ -62,6 +102,8 @@ class UserService {
 		if ("disabled".equals(status)) {
 			requireOwnerRemains(ownersBefore);
 		}
+		syncContact(ContactDirectory.Channel.PHONE, before[0], phoneN, tenant, id);
+		syncContact(ContactDirectory.Channel.EMAIL, before[1], emailN, tenant, id);
 		audit.record(AuditLog.Entry.of("user.upserted", "app_user", id, null).withDetails(Map.of("status", status)));
 		return view(id);
 	}
@@ -72,6 +114,8 @@ class UserService {
 		access.require(Permission.USER_MANAGE);
 		var principal = TenantContext.principal();
 		requireExists(userId);
+		requireOwnerToTouchOwner(userId);
+		lockOwners();
 		Set<String> before = rolesOfAnyScope(userId);
 		Set<String> after = grants.stream().map(RoleGrant::role).collect(Collectors.toSet());
 		boolean touchesOwner = before.contains("owner") != after.contains("owner");
@@ -104,6 +148,7 @@ class UserService {
 		tenantSession.bindCurrentTenant();
 		access.require(Permission.USER_MANAGE);
 		requireExists(userId);
+		requireOwnerToTouchOwner(userId);
 		var hashed = hasher.hash(pin);
 		jdbc.sql("""
 				UPDATE app_user SET pin_salt = :salt, pin_hash = :hash, pin_iterations = :iter, pin_set_at = now(),
@@ -146,8 +191,8 @@ class UserService {
 				.param("id", id).query((rs, n) -> new RoleGrant(rs.getString("role"),
 						rs.getObject("business_id", UUID.class), rs.getObject("store_id", UUID.class)))
 				.list();
-		return jdbc.sql("SELECT display_name, phone, status, pin_hash IS NOT NULL AS pin_set FROM app_user WHERE id = :id")
-				.param("id", id).query((rs, n) -> new UserView(id, rs.getString("display_name"), rs.getString("phone"),
+		return jdbc.sql("SELECT display_name, phone, email, status, pin_hash IS NOT NULL AS pin_set FROM app_user WHERE id = :id")
+				.param("id", id).query((rs, n) -> new UserView(id, rs.getString("display_name"), rs.getString("phone"), rs.getString("email"),
 						rs.getString("status"), rs.getBoolean("pin_set"), roles))
 				.single();
 	}

@@ -1,4 +1,4 @@
-# ADR 0008: Catalogue: units of measure, search, duplicates, starter packs, barcodes
+# ADR 0011: Catalogue: units of measure, search, duplicates, starter packs, barcodes
 
 Status: accepted (17 Oct 2026)
 

@@ -32,7 +32,7 @@ const modeArb = fc.constantFrom<GstMode>('regular', 'composition', 'non_gst')
 function serverEquations(b: PricedBill): { lineSumOk: boolean; lineTaxOk: boolean; headerOk: boolean } {
   const lineSum = b.lines.reduce((a, l) => a + l.lineTotalPaise, 0)
   const lineTax = b.lines.reduce((a, l) => a + l.taxPaise, 0)
-  const discountHeader = 0 // ADR 0006
+  const discountHeader = 0 // ADR 0009
   return {
     lineSumOk: lineSum === b.subtotalPaise + b.taxPaise,
     lineTaxOk: lineTax === b.taxPaise,

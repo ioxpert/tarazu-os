@@ -1,6 +1,6 @@
 -- Billing/POS + catalogue slice: richer products (units, tax, loose, pinned), customer-specific prices,
 -- cash shifts with an append-only close, the merchant UPI address, and the global platform product master.
--- See docs/adr/0005-offline-owner-approval.md and docs/adr/0006-billing-totals-and-tax.md.
+-- See docs/adr/0008-offline-owner-approval.md and docs/adr/0009-billing-totals-and-tax.md.
 
 -- ---------- product ----------
 -- unit is validated against the UomUnit enum by the sync handler, not by a CHECK: rows written before this
@@ -105,7 +105,7 @@ SELECT tarazu_make_append_only('shift_close');
 
 GRANT SELECT, INSERT ON shift, shift_close TO ${app_role};
 
--- ---------- platform product master: GLOBAL reference data (second exception to rule 3, docs/adr/0006) ----------
+-- ---------- platform product master: GLOBAL reference data (second exception to rule 3, docs/adr/0009) ----------
 -- Same rows for every merchant, maintained by ops (migration/admin role), read-only for the API role.
 -- Not append-only: a master row may be corrected. No tenant data ever flows into it.
 CREATE TABLE master_product (

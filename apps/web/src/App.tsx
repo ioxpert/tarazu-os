@@ -22,6 +22,8 @@ const KhataScreen = lazy(() => import('./ui/Khata'))
 const ShiftScreen = lazy(() => import('./ui/Shift'))
 const SettingsScreen = lazy(() => import('./ui/Settings'))
 const SetupScreen = lazy(() => import('./ui/Setup'))
+// Sign-up / login with a one-time code; registers this device and stores its sync config.
+const OtpOnboardingPage = lazy(() => import('./onboarding/OnboardingPage'))
 const OnboardingScreen = lazy(() => import('./ui/Onboarding'))
 
 function ItemDetailRoute(Detail: (p: { id: string }) => React.ReactElement) {
@@ -69,10 +71,19 @@ function Routes() {
 export function App() {
   const { t } = useTranslation()
   const harness = HARNESS_ENABLED && window.location.hash === '#/dev/sync'
+  const otpOnboarding = window.location.hash === '#/onboarding'
 
   useEffect(() => {
     void requestPersistence()
   }, [])
+
+  if (otpOnboarding) {
+    return (
+      <Suspense fallback={<p>{t('common.loading')}</p>}>
+        <OtpOnboardingPage />
+      </Suspense>
+    )
+  }
 
   if (harness) {
     return (

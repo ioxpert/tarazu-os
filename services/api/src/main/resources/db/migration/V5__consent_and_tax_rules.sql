@@ -38,7 +38,9 @@ CREATE VIEW consent_current WITH (security_invoker = true) AS
 SELECT DISTINCT ON (tenant_id, subject_type, subject_id, purpose)
        tenant_id, subject_type, subject_id, purpose, action, policy_version, channel, occurred_at, id AS event_id
 FROM consent_event
-ORDER BY tenant_id, subject_type, subject_id, purpose, occurred_at DESC, created_at DESC, id DESC;
+ORDER BY tenant_id, subject_type, subject_id, purpose,
+         -- a device clock running ahead must not let an old grant outrank a later withdrawal: never later than arrival
+         LEAST(occurred_at, created_at) DESC, created_at DESC, id DESC;
 
 -- Every disclosure to a third party, tied to the consent event that allowed it.
 CREATE TABLE third_party_sharing_log (

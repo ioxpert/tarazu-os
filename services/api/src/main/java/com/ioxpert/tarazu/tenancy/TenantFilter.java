@@ -26,14 +26,32 @@ class TenantFilter extends OncePerRequestFilter {
 		this.authenticators = authenticators;
 	}
 
+	/** Largest request body accepted on /v1/** (a full 500-operation batch is well under 1 MB). */
+	static final long MAX_BODY_BYTES = 8L * 1024 * 1024;
+
+	private static boolean isPublic(String uri) {
+		return PublicPaths.ALL.contains(uri);
+	}
+
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
-		return !request.getRequestURI().startsWith("/v1/");
+		// fail closed: everything is authenticated except the health/info probes. (Matching "/v1/" on the raw URI
+		// let encoded or ;parameterised paths such as /%76%31/... or /v1;x=y/... slip past.)
+		String uri = request.getRequestURI();
+		return isPublic(uri) || uri.equals("/actuator/health") || uri.startsWith("/actuator/health/") || uri.equals("/actuator/info");
 	}
 
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
 			throws ServletException, IOException {
+		if (request.getContentLengthLong() > MAX_BODY_BYTES) {
+			response.setStatus(413);
+			response.setContentType("application/problem+json");
+			response.getOutputStream().write(("{\"title\":\"Payload Too Large\",\"status\":413,\"code\":\"payload_too_large\","
+					+ "\"detail\":\"Request body is limited to 8 MiB; upload fewer operations per request\"}")
+					.getBytes(StandardCharsets.UTF_8));
+			return;
+		}
 		Principal principal;
 		try {
 			principal = resolve(request).orElse(null);

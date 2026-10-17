@@ -1,4 +1,4 @@
-# ADR 0007: POS commit path, local state and screen architecture
+# ADR 0010: POS commit path, local state and screen architecture
 
 Status: accepted (17 Oct 2026)
 
@@ -19,7 +19,7 @@ PWA and a Windows PC with no network, restart offline, and keep first-load JS un
   local-only `held_bill` table. Only a finalised invoice becomes an operation.
 - **Settings are device state.** Merchant profile, discount policy, printer and language are JSON in `device_state`.
   The server fills business name, GST mode, GSTIN and UPI ID when the device is online (`GET /v1/identity/me`).
-- **Offline approvals** use cached owner PIN verifiers (ADR 0005); the approval travels on the invoice or credit note.
+- **Offline approvals** use cached owner PIN verifiers (ADR 0008); the approval travels on the invoice or credit note.
 - **Catalogue in memory.** The whole catalogue (tens of thousands of rows at most) is loaded into a phonetic search
   index at start and patched after each sale (only the sold products are re-read). Lookup does not touch SQLite.
 - **Shift cash** is tracked per device in `device_state shift_cash:<id>` inside the same transaction as each cash

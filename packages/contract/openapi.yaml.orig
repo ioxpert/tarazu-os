@@ -1,0 +1,1658 @@
+openapi: 3.1.0
+info:
+  title: Tarazu OS API
+  version: 0.1.0
+  description: |
+    Single contract for web today and Android/iOS later. Clients are generated from this file
+    (see apps/web `npm run gen:api`). Keep it in lockstep with services/api.
+
+    **Authentication.** A registered device sends `Authorization: Bearer tzd.<tenantId>.<deviceId>.<secret>`
+    (issued once by `PUT /v1/identity/devices/{id}`). Management calls also identify the acting staff member
+    with `X-Staff-Id` + `X-Staff-Pin`. A revoked device gets 401 `device_revoked` on its next request, which is
+    how revocation takes effect at the next sync. Every `/v1/**` call without a valid credential is 401.
+    The `X-Tenant-Id` dev header exists only on servers started with `tarazu.auth.dev-header-enabled=true`.
+
+    **Writes are idempotent.** Synced writes carry a UUIDv7 `operationId` and an `idempotencyKey`;
+    management writes use client-chosen ids. Replaying any of them is safe.
+
+    **Units.** Money is integer paise. Quantity is integer milli-units (1000 = 1 unit). No floats.
+servers:
+  - url: http://localhost:8080
+security:
+  - deviceToken: []
+  - sessionToken: []
+tags:
+  - name: auth
+    description: OTP onboarding and login (email, phone or both, per deployment) and bearer sessions.
+  - name: sync
+    description: Device upload queue, acknowledgements, review flags and PowerSync credentials.
+  - name: identity
+    description: Business, store, device, staff, roles, PIN and audit log.
+  - name: consent
+    description: Purpose-specific consent ledger, third-party sharing log and local-only mode.
+  - name: tax
+    description: Server-controlled, effective-dated GST rule tables.
+  - name: health
+    description: Liveness.
+paths:
+  /actuator/health:
+    get:
+      operationId: getHealth
+      summary: Liveness and database health
+      tags: [health]
+      security: []
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /v1/auth/otp/config:
+    get:
+      operationId: getOtpConfig
+      summary: Which contact proofs sign-up needs on this deployment (public)
+      description: |
+        `mode` is chosen per deployment: `email`, `phone`, `either` (give one or both; each one given is verified) or
+        `both` (email and phone are both required and verified). `enabled` is false when OTP is not configured (no pepper
+        or no delivery for an enabled channel); the other auth calls then answer 503.
+      tags: [auth]
+      security: []
+      responses:
+        '200':
+          description: Config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpConfig'
+  /v1/auth/signup/start:
+    post:
+      operationId: startSignup
+      summary: Start onboarding; sends a code to each contact that must be verified (public)
+      description: Creates nothing durable yet. A contact that already has an account is 409 `contact_in_use`. Codes per contact are rate-limited.
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupStartRequest'
+      responses:
+        '202':
+          description: Codes sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignupStarted'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/auth/signup/verify:
+    post:
+      operationId: verifySignup
+      summary: Verify one contact's code; when the last required contact is verified the tenant, first business, store and owner are created (public)
+      description: |
+        Wrong codes are counted (5 per code, then 429 `too_many_attempts`; ask for a new one). While contacts remain,
+        `status` is `pending` with `remainingChannels`. On `completed`, `session` is the owner's bearer session.
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupVerifyRequest'
+      responses:
+        '200':
+          description: Progress or completion
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignupProgress'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '410':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/auth/signup/resend:
+    post:
+      operationId: resendSignupCode
+      summary: Send a fresh code for one contact of a sign-up; the earlier code stops working (public)
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupResendRequest'
+      responses:
+        '202':
+          description: Sent
+        '400':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/auth/login/start:
+    post:
+      operationId: startLogin
+      summary: Send a login code to an email or phone (public)
+      description: Always 202 with a challenge token, whether or not an account exists (no account enumeration).
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginStartRequest'
+      responses:
+        '202':
+          description: Challenge issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginStarted'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/auth/login/verify:
+    post:
+      operationId: verifyLogin
+      summary: Exchange a login code for a bearer session (public)
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginVerifyRequest'
+      responses:
+        '200':
+          description: Session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '410':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/auth/logout:
+    post:
+      operationId: logout
+      summary: End the calling session
+      tags: [auth]
+      security:
+        - sessionToken: []
+      responses:
+        '204':
+          description: Signed out
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+  /v1/sync/upload:
+    post:
+      operationId: uploadOperations
+      summary: Upload a batch from the device outbox (PowerSync uploadData)
+      description: |
+        Every operation is stored in the immutable operation log, applied under its entity's conflict
+        policy, and acknowledged in `results` (same order as the request). Per-operation problems never fail
+        the request: a permanently invalid operation is `rejected` (kept raw in the log), one whose parent entity
+        has not arrived is `deferred` and applied automatically when it does, a policy violation on a sale that
+        already happened is applied and `flagged`. Replaying a batch is safe: known operations come back as
+        `duplicate`. Whole-request failures (400, 403, 413, 422) store nothing. Bodies over 8 MiB are refused (413).
+        A device clock more than 24 h ahead of the server is clamped for merging and flagged `clock_skew`.
+      tags: [sync]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadRequest'
+      responses:
+        '200':
+          description: Batch processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          description: Device revoked, device mismatch, or the merchant is in local-only mode
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '413':
+          $ref: '#/components/responses/Problem'
+        '422':
+          description: Unknown store or device for this tenant
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /v1/sync/status:
+    get:
+      operationId: getSyncStatus
+      summary: What the server made of this device's operations
+      description: Counts for the calling device (whole tenant when called without a device credential).
+      tags: [sync]
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncStatus'
+        '401':
+          $ref: '#/components/responses/Problem'
+  /v1/sync/rejected:
+    get:
+      operationId: listRejectedOperations
+      summary: Operations the server rejected (action required on the device)
+      tags: [sync]
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        '200':
+          description: Rejected operations, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RejectedOperation'
+        '401':
+          $ref: '#/components/responses/Problem'
+  /v1/sync/flags:
+    get:
+      operationId: listConflictFlags
+      summary: Review queue (oversold stock, party clashes, missing approvals, ...)
+      tags: [sync]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [open, resolved, dismissed], default: open } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        '200':
+          description: Flags, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConflictFlag'
+        '401':
+          $ref: '#/components/responses/Problem'
+  /v1/sync/flags/{id}/resolve:
+    post:
+      operationId: resolveConflictFlag
+      summary: Resolve or dismiss a review flag (owner or manager)
+      tags: [sync]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/StaffId'
+        - $ref: '#/components/parameters/StaffPin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveFlagRequest'
+      responses:
+        '204':
+          description: Resolved (or already closed)
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /v1/sync/credentials:
+    get:
+      operationId: getSyncCredentials
+      summary: Short-lived token for the self-hosted PowerSync service
+      description: Used by the PowerSync connector's fetchCredentials(). 503 when PowerSync is not configured.
+      tags: [sync]
+      responses:
+        '200':
+          description: Credentials (token expires in minutes; the bucket key is the merchant id)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncCredentials'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/identity/me:
+    get:
+      operationId: getMe
+      summary: Who the server thinks is calling
+      tags: [identity]
+      parameters:
+        - $ref: '#/components/parameters/StaffId'
+        - $ref: '#/components/parameters/StaffPin'
+      responses:
+        '200':
+          description: The caller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+        '401':
+          $ref: '#/components/responses/Problem'
+  /v1/identity/businesses/{id}:
+    put:
+      operationId: putBusiness
+      summary: Create or update a business (owner). GST mode changes are audited.
+      tags: [identity]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/StaffId'
+        - $ref: '#/components/parameters/StaffPin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusinessRequest'
+      responses:
+        '200':
+          description: Stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Business'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /v1/identity/stores:
+    get:
+      operationId: listStores
+      summary: Stores of this tenant (needed to register a device after signing in)
+      tags: [identity]
+      responses:
+        '200':
+          description: Stores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Store'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+  /v1/identity/stores/{id}:
+    put:
+      operationId: putStore
+      summary: Create or rename a store (owner)
+      tags: [identity]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/StaffId'
+        - $ref: '#/components/parameters/StaffPin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StoreRequest'
+      responses:
+        '200':
+          description: Stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Store'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /v1/identity/devices:
+    get:
+      operationId: listDevices
+      summary: Registered devices
+      tags: [identity]
+      parameters:
+        - $ref: '#/components/parameters/StaffId'
+        - $ref: '#/components/parameters/StaffPin'
+      responses:
+        '200':
+          description: Devices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Device'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+  /v1/identity/devices/{id}:
+    put:
+      operationId: registerDevice
+      summary: Register a device and receive its credential (shown once)
+      description: |
+        Idempotent on the client-chosen device id. 201 with `token` on first registration; a replay is 200 without
+        a token (the secret is never shown again; revoke and register a new device if it was lost).
+      tags: [identity]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/StaffId'
+        - $ref: '#/components/parameters/StaffPin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceRequest'
+      responses:
+        '200':
+          description: Already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceRegistered'
+        '201':
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceRegistered'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /v1/identity/devices/{id}/revoke:
+    post:
+      operationId: revokeDevice
+      summary: Revoke a device; it is refused at its next request
+      tags: [identity]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/StaffId'
+        - $ref: '#/components/parameters/StaffPin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonRequest'
+      responses:
+        '204':
+          description: Revoked (or already revoked)
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /v1/identity/users:
+    get:
+      operationId: listUsers
+      summary: Staff users
+      tags: [identity]
+      parameters:
+        - $ref: '#/components/parameters/StaffId'
+        - $ref: '#/components/parameters/StaffPin'
+      responses:
+        '200':
+          description: Users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+  /v1/identity/users/{id}:
+    get:
+      operationId: getUser
+      summary: One staff user
+      tags: [identity]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/StaffId'
+        - $ref: '#/components/parameters/StaffPin'
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+    put:
+      operationId: putUser
+      summary: Create or update a staff user (idempotent on the client-chosen id)
+      tags: [identity]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/StaffId'
+        - $ref: '#/components/parameters/StaffPin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+      responses:
+        '200':
+          description: Stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /v1/identity/users/{id}/roles:
+    put:
+      operationId: putUserRoles
+      summary: Replace a user's roles. Only an owner can grant or remove owner; the last owner cannot be removed.
+      tags: [identity]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/StaffId'
+        - $ref: '#/components/parameters/StaffPin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RolesRequest'
+      responses:
+        '200':
+          description: Stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /v1/identity/users/{id}/pin:
+    put:
+      operationId: putUserPin
+      summary: Set a staff member's PIN (4-8 digits)
+      tags: [identity]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/StaffId'
+        - $ref: '#/components/parameters/StaffPin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetPinRequest'
+      responses:
+        '204':
+          description: PIN set
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /v1/identity/users/{id}/pin/verify:
+    post:
+      operationId: verifyUserPin
+      summary: Check a PIN (counts failures; locks after five misses)
+      tags: [identity]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyPinRequest'
+      responses:
+        '200':
+          description: Verdict (`valid:false` for a wrong PIN)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyPinResponse'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '423':
+          $ref: '#/components/responses/Problem'
+  /v1/identity/audit-log:
+    get:
+      operationId: listAuditLog
+      summary: Audit trail (actor, action, reason, timestamp), newest first
+      tags: [identity]
+      parameters:
+        - $ref: '#/components/parameters/StaffId'
+        - $ref: '#/components/parameters/StaffPin'
+        - { name: entityType, in: query, schema: { type: string } }
+        - { name: entityId, in: query, schema: { type: string, format: uuid } }
+        - { name: action, in: query, schema: { type: string } }
+        - { name: before, in: query, schema: { type: string, format: date-time } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200':
+          description: Entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditEntry'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+  /v1/consent/purposes:
+    get:
+      operationId: listConsentPurposes
+      summary: The closed list of consent purposes (none is pre-selected)
+      tags: [consent]
+      responses:
+        '200':
+          description: Purposes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConsentPurpose'
+        '401':
+          $ref: '#/components/responses/Problem'
+  /v1/consent/events:
+    post:
+      operationId: recordConsentEvent
+      summary: Record a grant or a withdrawal (idempotent on operationId / idempotencyKey)
+      tags: [consent]
+      parameters:
+        - $ref: '#/components/parameters/StaffId'
+        - $ref: '#/components/parameters/StaffPin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentEventRequest'
+      responses:
+        '200':
+          description: Stored (or the previously stored event on replay)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentEvent'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /v1/consent/subjects/{subjectType}/{subjectId}:
+    get:
+      operationId: getSubjectConsent
+      summary: Current consent per purpose, plus the full history
+      tags: [consent]
+      parameters:
+        - { name: subjectType, in: path, required: true, schema: { type: string, enum: [party, user] } }
+        - { name: subjectId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Consent state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubjectConsent'
+        '401':
+          $ref: '#/components/responses/Problem'
+  /v1/consent/sharing-log:
+    get:
+      operationId: listSharingLog
+      summary: Third-party disclosures
+      tags: [consent]
+      parameters:
+        - { name: subjectType, in: query, schema: { type: string, enum: [party, user] } }
+        - { name: subjectId, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Disclosures, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SharingLogEntry'
+        '401':
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: logThirdPartySharing
+      summary: Log a disclosure. Refused unless consent is currently granted and the merchant is not local-only.
+      tags: [consent]
+      parameters:
+        - $ref: '#/components/parameters/StaffId'
+        - $ref: '#/components/parameters/StaffPin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SharingLogRequest'
+      responses:
+        '200':
+          description: Stored (or the previously stored entry on replay)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SharingLogEntry'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /v1/consent/mode:
+    get:
+      operationId: getDataMode
+      summary: Is this merchant in local-only mode?
+      tags: [consent]
+      responses:
+        '200':
+          description: Mode
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataMode'
+        '401':
+          $ref: '#/components/responses/Problem'
+    put:
+      operationId: setDataMode
+      summary: Switch local-only mode on or off (owner). While on, uploads and sharing are refused.
+      tags: [consent]
+      parameters:
+        - $ref: '#/components/parameters/StaffId'
+        - $ref: '#/components/parameters/StaffPin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataModeRequest'
+      responses:
+        '200':
+          description: Mode
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataMode'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+  /v1/tax/rules:
+    get:
+      operationId: listTaxRules
+      summary: Change feed of GST rule rows (id > sinceId, oldest first)
+      description: Poll with the returned `maxId`. Rules are effective-dated; a rate change is a new row.
+      tags: [tax]
+      parameters:
+        - { name: sinceId, in: query, schema: { type: integer, format: int64, minimum: 0, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 500 } }
+      responses:
+        '200':
+          description: A page of rules
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxRulePage'
+        '401':
+          $ref: '#/components/responses/Problem'
+  /v1/tax/rules/resolve:
+    get:
+      operationId: resolveTaxRule
+      summary: The rule in force for an HSN code on a date (most specific prefix, latest effective date)
+      tags: [tax]
+      parameters:
+        - { name: hsn, in: query, required: true, schema: { type: string, pattern: '^[0-9]{2,8}$' } }
+        - { name: asOf, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: The rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxRule'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /v1/tax/thresholds:
+    get:
+      operationId: listTaxThresholds
+      summary: GST thresholds in force on a date (latest per key)
+      tags: [tax]
+      parameters:
+        - { name: asOf, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Thresholds
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaxThreshold'
+        '401':
+          $ref: '#/components/responses/Problem'
+components:
+  securitySchemes:
+    sessionToken:
+      type: http
+      scheme: bearer
+      description: |
+        Owner/staff session `tzs.<tenantId>.<sessionId>.<secret>` from OTP sign-up or login (30 days, revocable by logout
+        or by disabling the user). Carries the user's roles, so management calls need no X-Staff headers.
+    deviceToken:
+      type: http
+      scheme: bearer
+      description: |
+        Device credential `tzd.<tenantId>.<deviceId>.<secret>` issued once at registration. Bearer JWT / OTP
+        owner login is a later PR.
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    StaffId:
+      name: X-Staff-Id
+      in: header
+      required: false
+      description: Acting staff member. Required (with X-Staff-Pin) for management calls.
+      schema: { type: string, format: uuid }
+    StaffPin:
+      name: X-Staff-Pin
+      in: header
+      required: false
+      description: The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes.
+      schema: { type: string, pattern: '^[0-9]{4,8}$' }
+  responses:
+    Problem:
+      description: Error. `code` is a stable machine-readable reason.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    OtpConfig:
+      type: object
+      required: [enabled, mode, channels, signupRequires, codeTtlMinutes, resendSeconds]
+      properties:
+        enabled: { type: boolean }
+        mode: { type: string, enum: [email, phone, either, both] }
+        channels:
+          type: array
+          description: Channels a code can be sent on (sign-up and login).
+          items: { type: string, enum: [email, phone] }
+        signupRequires:
+          type: array
+          description: Contacts sign-up always needs. Empty in `either` mode (give at least one).
+          items: { type: string, enum: [email, phone] }
+        codeTtlMinutes: { type: integer }
+        resendSeconds: { type: integer }
+    SignupStartRequest:
+      type: object
+      required: [ownerName, businessName]
+      properties:
+        ownerName: { type: string, minLength: 1, maxLength: 200 }
+        businessName: { type: string, minLength: 1, maxLength: 200 }
+        email: { type: [string, 'null'], maxLength: 254 }
+        phone: { type: [string, 'null'], maxLength: 20, description: 'Indian mobile (10 digits, +91 implied) or +country number' }
+    ChallengeInfo:
+      type: object
+      required: [channel, sentTo, expiresAt, resendAfter]
+      properties:
+        channel: { type: string, enum: [email, phone] }
+        sentTo: { type: string, description: 'Masked contact, for example a***@example.in' }
+        expiresAt: { type: string, format: date-time }
+        resendAfter: { type: string, format: date-time }
+    SignupStarted:
+      type: object
+      required: [signupToken, challenges]
+      properties:
+        signupToken: { type: string, description: Opaque; send it back with each verify/resend }
+        challenges:
+          type: array
+          items: { $ref: '#/components/schemas/ChallengeInfo' }
+    SignupVerifyRequest:
+      type: object
+      required: [signupToken, channel, code]
+      properties:
+        signupToken: { type: string }
+        channel: { type: string, enum: [email, phone] }
+        code: { type: string, pattern: '^[0-9]{6}$' }
+    SignupResendRequest:
+      type: object
+      required: [signupToken, channel]
+      properties:
+        signupToken: { type: string }
+        channel: { type: string, enum: [email, phone] }
+    Session:
+      type: object
+      required: [token, expiresAt, tenantId, userId, roles]
+      properties:
+        token: { type: string, description: Bearer session token }
+        expiresAt: { type: string, format: date-time }
+        tenantId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/Role' }
+    SignupProgress:
+      type: object
+      required: [status, remainingChannels]
+      properties:
+        status: { type: string, enum: [pending, completed] }
+        remainingChannels:
+          type: array
+          items: { type: string, enum: [email, phone] }
+        session: { oneOf: [{ $ref: '#/components/schemas/Session' }, { type: 'null' }] }
+        businessId: { type: [string, 'null'], format: uuid }
+        storeId: { type: [string, 'null'], format: uuid }
+    LoginStartRequest:
+      type: object
+      required: [channel, contact]
+      properties:
+        channel: { type: string, enum: [email, phone] }
+        contact: { type: string, maxLength: 254 }
+    LoginStarted:
+      type: object
+      required: [challengeToken, expiresAt, resendAfter]
+      properties:
+        challengeToken: { type: string }
+        expiresAt: { type: string, format: date-time }
+        resendAfter: { type: string, format: date-time }
+    LoginVerifyRequest:
+      type: object
+      required: [challengeToken, code]
+      properties:
+        challengeToken: { type: string }
+        code: { type: string, pattern: '^[0-9]{6}$' }
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          examples: [UP]
+    Problem:
+      type: object
+      properties:
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code:
+          type: string
+          description: Stable reason, e.g. device_revoked, invalid_token, permission_denied, local_only_mode, consent_not_granted.
+    Operation:
+      type: object
+      description: |
+        One client-side write from the device's operation log. `payload` depends on `entityType`; see the
+        `*Payload` schemas (ProductPayload, StockMovementPayload, ...).
+      required: [operationId, storeId, deviceId, localSeq, hlc, idempotencyKey, entityType, entityId, opType, schemaVersion, payload]
+      properties:
+        operationId: { type: string, format: uuid, description: 'UUIDv7 (version 7 is enforced).' }
+        storeId: { type: string, format: uuid }
+        deviceId: { type: string, format: uuid }
+        actorUserId:
+          type: [string, 'null']
+          format: uuid
+          description: Staff member who did it (device-asserted; audited, not trusted for access control).
+        localSeq: { type: integer, format: int64, minimum: 0, description: 'Per-device, strictly increasing.' }
+        hlc:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z-[0-9a-fA-F]{4}-[A-Za-z0-9]{1,16}$'
+          description: 'Hybrid logical clock: UTC millis, 4-hex counter, node id. Example 2026-10-17T10:00:00.000Z-0000-a1b2c3d4'
+        idempotencyKey: { type: string, minLength: 1, maxLength: 128, description: 'Unique per tenant; use deviceId:localSeq.' }
+        entityType:
+          type: string
+          minLength: 1
+          maxLength: 64
+          examples: [product, price_version, party, party_merge, stock_movement, invoice, credit_note, purchase_receipt, order, order_transition, payment, khata_entry]
+        entityId: { type: string, format: uuid }
+        opType: { type: string, enum: [create, update, void] }
+        schemaVersion: { type: integer, minimum: 1 }
+        payload:
+          description: Shape depends on entityType; the first matching schema documents it.
+          anyOf:
+            - $ref: '#/components/schemas/ProductPayload'
+            - $ref: '#/components/schemas/PriceVersionPayload'
+            - $ref: '#/components/schemas/PartyPayload'
+            - $ref: '#/components/schemas/PartyMergePayload'
+            - $ref: '#/components/schemas/StockMovementPayload'
+            - $ref: '#/components/schemas/InvoicePayload'
+            - $ref: '#/components/schemas/CreditNotePayload'
+            - $ref: '#/components/schemas/PurchaseReceiptPayload'
+            - $ref: '#/components/schemas/OrderPayload'
+            - $ref: '#/components/schemas/OrderTransitionPayload'
+            - $ref: '#/components/schemas/PaymentPayload'
+            - $ref: '#/components/schemas/KhataEntryPayload'
+    UploadRequest:
+      type: object
+      required: [operations]
+      properties:
+        operations:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/Operation'
+    OperationResult:
+      type: object
+      required: [operationId, status]
+      properties:
+        operationId: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [applied, flagged, deferred, rejected, duplicate]
+          description: |
+            applied; flagged = applied but needs review; deferred = stored, waiting for a parent entity (applied
+            automatically later, nothing to resend); rejected = stored, not applied (see code; action required);
+            duplicate = already known (see originalStatus).
+        originalStatus:
+          type: [string, 'null']
+          description: For duplicate, the operation's current status.
+        code:
+          type: [string, 'null']
+          description: |
+            rejected: invalid_payload, unknown_entity_type, unsupported_schema_version, immutable_document, append_only,
+            duplicate_invoice_number, integrity_violation, internal_error (server bug; kept raw for re-application). flagged: comma-separated flag kinds. deferred: missing_dependency.
+        message: { type: [string, 'null'] }
+    UploadResponse:
+      type: object
+      required: [accepted, duplicates, rejected, deferred, flagged, results]
+      properties:
+        accepted: { type: integer, description: Newly stored this call (any outcome) }
+        duplicates: { type: integer, description: 'Already stored, ignored' }
+        rejected: { type: integer }
+        deferred: { type: integer }
+        flagged: { type: integer }
+        results:
+          type: array
+          description: One acknowledgement per request operation, same order.
+          items:
+            $ref: '#/components/schemas/OperationResult'
+    SyncStatus:
+      type: object
+      required: [applied, flagged, deferred, rejected, openFlags]
+      properties:
+        applied: { type: integer, format: int64 }
+        flagged: { type: integer, format: int64 }
+        deferred: { type: integer, format: int64 }
+        rejected: { type: integer, format: int64 }
+        openFlags: { type: integer, format: int64, description: Open review flags for the whole tenant }
+        lastOperationAt: { type: [string, 'null'], format: date-time }
+    RejectedOperation:
+      type: object
+      required: [operationId, entityType, entityId]
+      properties:
+        operationId: { type: string, format: uuid }
+        entityType: { type: string }
+        entityId: { type: string, format: uuid }
+        code: { type: [string, 'null'] }
+        detail: { type: [string, 'null'] }
+    ConflictFlag:
+      type: object
+      required: [id, kind, status, detail, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        kind:
+          type: string
+          description: oversold, party_identity_conflict, invalid_gstin, party_merge_conflict, order_transition_conflict, approval_required, total_mismatch, tax_rate_mismatch, composition_requires_bill_of_supply, composition_tax_charged, tax_invoice_without_gst_registration, credit_exceeds_invoice, permission_violation, unknown_actor, clock_skew, stuck_operation
+        entityType: { type: [string, 'null'] }
+        entityId: { type: [string, 'null'], format: uuid }
+        operationId: { type: [string, 'null'], format: uuid }
+        status: { type: string, enum: [open, resolved, dismissed] }
+        detail: { type: object, additionalProperties: true }
+        createdAt: { type: string, format: date-time }
+        resolvedAt: { type: [string, 'null'], format: date-time }
+        resolutionNote: { type: [string, 'null'] }
+    ResolveFlagRequest:
+      type: object
+      required: [status, note]
+      properties:
+        status: { type: string, enum: [resolved, dismissed] }
+        note: { type: string, minLength: 1, maxLength: 500 }
+    SyncCredentials:
+      type: object
+      required: [endpoint, token, expiresAt]
+      properties:
+        endpoint: { type: string, description: PowerSync service URL }
+        token: { type: string, description: 'HS256 JWT; claims sub=deviceId, merchant_id (bucket key), store_id, device_id' }
+        expiresAt: { type: string, format: date-time }
+    Me:
+      type: object
+      required: [tenantId, roles]
+      properties:
+        tenantId: { type: string, format: uuid }
+        deviceId: { type: [string, 'null'], format: uuid }
+        storeId: { type: [string, 'null'], format: uuid }
+        userId: { type: [string, 'null'], format: uuid }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/Role' }
+    Role:
+      type: string
+      enum: [owner, manager, cashier, purchaser, accountant, sales_rep, delivery_agent]
+    GstMode:
+      type: string
+      enum: [regular, composition, non_gst]
+      description: composition merchants issue a bill of supply; non_gst is unregistered.
+    BusinessRequest:
+      type: object
+      required: [name, gstMode]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        gstMode: { $ref: '#/components/schemas/GstMode' }
+        gstin: { type: [string, 'null'], pattern: '^[0-9A-Z]{15}$' }
+        stateCode: { type: [string, 'null'], pattern: '^[0-9]{2}$' }
+    Business:
+      type: object
+      required: [id, name, gstMode]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        gstMode: { $ref: '#/components/schemas/GstMode' }
+        gstin: { type: [string, 'null'] }
+        stateCode: { type: [string, 'null'] }
+    StoreRequest:
+      type: object
+      required: [businessId, name]
+      properties:
+        businessId: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 200 }
+    Store:
+      type: object
+      required: [id, businessId, name]
+      properties:
+        id: { type: string, format: uuid }
+        businessId: { type: string, format: uuid }
+        name: { type: string }
+    DeviceRequest:
+      type: object
+      required: [storeId]
+      properties:
+        storeId: { type: string, format: uuid }
+        label: { type: [string, 'null'], maxLength: 100 }
+    DeviceRegistered:
+      type: object
+      required: [id, storeId]
+      properties:
+        id: { type: string, format: uuid }
+        storeId: { type: string, format: uuid }
+        label: { type: [string, 'null'] }
+        token:
+          type: [string, 'null']
+          description: The device credential. Present only on first registration (201); store it securely.
+    Device:
+      type: object
+      required: [id, storeId, status]
+      properties:
+        id: { type: string, format: uuid }
+        storeId: { type: string, format: uuid }
+        label: { type: [string, 'null'] }
+        status: { type: string, enum: [active, revoked] }
+        lastSeenAt: { type: [string, 'null'], format: date-time }
+        revokedAt: { type: [string, 'null'], format: date-time }
+        revokeReason: { type: [string, 'null'] }
+    ReasonRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    UserRequest:
+      type: object
+      required: [displayName]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        phone: { type: [string, 'null'], maxLength: 20, description: Registers the number for OTP login; 409 contact_in_use if another account holds it }
+        email: { type: [string, 'null'], maxLength: 254, description: Registers the address for OTP login }
+        status: { type: string, enum: [active, disabled], default: active }
+    RoleGrant:
+      type: object
+      required: [role]
+      properties:
+        role: { $ref: '#/components/schemas/Role' }
+        businessId: { type: [string, 'null'], format: uuid, description: Scope the role to one business }
+        storeId: { type: [string, 'null'], format: uuid, description: Scope the role to one store }
+    RolesRequest:
+      type: object
+      required: [roles, reason]
+      properties:
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/RoleGrant' }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    User:
+      type: object
+      required: [id, displayName, status, pinSet, roles]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string }
+        phone: { type: [string, 'null'] }
+        email: { type: [string, 'null'] }
+        status: { type: string, enum: [active, disabled] }
+        pinSet: { type: boolean }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/RoleGrant' }
+    SetPinRequest:
+      type: object
+      required: [pin, reason]
+      properties:
+        pin: { type: string, pattern: '^[0-9]{4,8}$' }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    VerifyPinRequest:
+      type: object
+      required: [pin]
+      properties:
+        pin: { type: string }
+    VerifyPinResponse:
+      type: object
+      required: [valid, roles]
+      properties:
+        valid: { type: boolean }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/Role' }
+    AuditEntry:
+      type: object
+      required: [id, occurredAt, action, details]
+      properties:
+        id: { type: string, format: uuid }
+        occurredAt: { type: string, format: date-time }
+        actorUserId: { type: [string, 'null'], format: uuid }
+        actorDeviceId: { type: [string, 'null'], format: uuid }
+        action: { type: string, examples: ['device.revoked', 'credit_note.issued', 'invoice.owner_approved'] }
+        entityType: { type: [string, 'null'] }
+        entityId: { type: [string, 'null'], format: uuid }
+        reason: { type: [string, 'null'] }
+        details: { type: object, additionalProperties: true }
+    ConsentPurpose:
+      type: object
+      required: [id, description, thirdParty]
+      properties:
+        id: { type: string, examples: [marketing_messages] }
+        description: { type: string }
+        thirdParty: { type: boolean, description: This purpose involves disclosure to third parties (needs the sharing log) }
+    ConsentEventRequest:
+      type: object
+      description: Every field is required on purpose; the server never defaults a consent.
+      required: [operationId, idempotencyKey, subjectType, subjectId, purpose, action, policyVersion, channel, occurredAt]
+      properties:
+        operationId: { type: string, format: uuid, description: UUIDv7 }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 128 }
+        subjectType: { type: string, enum: [party, user] }
+        subjectId: { type: string, format: uuid }
+        purpose: { type: string }
+        action: { type: string, enum: [grant, withdraw] }
+        policyVersion: { type: string, maxLength: 64, description: The notice version the person saw }
+        channel: { type: string, enum: [in_app, paper, verbal, whatsapp, sms] }
+        occurredAt: { type: string, format: date-time }
+    ConsentEvent:
+      type: object
+      required: [id, subjectType, subjectId, purpose, action, policyVersion, channel, occurredAt]
+      properties:
+        id: { type: string, format: uuid }
+        subjectType: { type: string, enum: [party, user] }
+        subjectId: { type: string, format: uuid }
+        purpose: { type: string }
+        action: { type: string, enum: [grant, withdraw] }
+        policyVersion: { type: string }
+        channel: { type: string }
+        occurredAt: { type: string, format: date-time }
+    SubjectConsent:
+      type: object
+      required: [subjectType, subjectId, current, history]
+      properties:
+        subjectType: { type: string, enum: [party, user] }
+        subjectId: { type: string, format: uuid }
+        current:
+          type: array
+          description: Latest event per purpose. A purpose with no event, or whose latest is a withdrawal, is not consented.
+          items: { $ref: '#/components/schemas/ConsentEvent' }
+        history:
+          type: array
+          items: { $ref: '#/components/schemas/ConsentEvent' }
+    SharingLogRequest:
+      type: object
+      required: [operationId, idempotencyKey, subjectType, subjectId, purpose, recipient, dataCategories, sharedAt]
+      properties:
+        operationId: { type: string, format: uuid, description: UUIDv7 }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 128 }
+        subjectType: { type: string, enum: [party, user] }
+        subjectId: { type: string, format: uuid }
+        purpose: { type: string }
+        recipient: { type: string, minLength: 1, maxLength: 200 }
+        dataCategories:
+          type: array
+          minItems: 1
+          items: { type: string }
+        sharedAt: { type: string, format: date-time }
+    SharingLogEntry:
+      type: object
+      required: [id, subjectType, subjectId, purpose, recipient, dataCategories, consentEventId, sharedAt]
+      properties:
+        id: { type: string, format: uuid }
+        subjectType: { type: string, enum: [party, user] }
+        subjectId: { type: string, format: uuid }
+        purpose: { type: string }
+        recipient: { type: string }
+        dataCategories:
+          type: array
+          items: { type: string }
+        consentEventId: { type: string, format: uuid }
+        sharedAt: { type: string, format: date-time }
+    DataModeRequest:
+      type: object
+      required: [localOnly, reason]
+      properties:
+        localOnly: { type: boolean }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    DataMode:
+      type: object
+      required: [localOnly]
+      properties:
+        localOnly: { type: boolean }
+    TaxRule:
+      type: object
+      required: [id, hsnPrefix, description, rateBp, cessBp, effectiveFrom]
+      properties:
+        id: { type: integer, format: int64 }
+        hsnPrefix: { type: string }
+        description: { type: string }
+        rateBp: { type: integer, description: 'Basis points: 1800 = 18%' }
+        cessBp: { type: integer }
+        effectiveFrom: { type: string, format: date }
+        notificationRef: { type: [string, 'null'] }
+    TaxRulePage:
+      type: object
+      required: [rules, maxId, more]
+      properties:
+        rules:
+          type: array
+          items: { $ref: '#/components/schemas/TaxRule' }
+        maxId: { type: integer, format: int64 }
+        more: { type: boolean }
+    TaxThreshold:
+      type: object
+      required: [key, valuePaise, effectiveFrom]
+      properties:
+        key: { type: string }
+        valuePaise: { type: integer, format: int64 }
+        effectiveFrom: { type: string, format: date }
+        notificationRef: { type: [string, 'null'] }
+    Approval:
+      type: object
+      description: Owner-PIN approval for a discount, void/credit note or backdated bill (PIN checked on the device).
+      required: [approverUserId, reason]
+      properties:
+        approverUserId: { type: string, format: uuid }
+        reason: { type: string, minLength: 1 }
+    ProductPayload:
+      type: object
+      description: entityType product. create needs name. Fields merge individually by HLC (newest write per field wins). void deactivates.
+      properties:
+        name: { type: string }
+        barcode: { type: [string, 'null'] }
+        sku: { type: [string, 'null'] }
+        hsn: { type: [string, 'null'] }
+        unit: { type: string }
+        active: { type: boolean }
+    PriceVersionPayload:
+      type: object
+      description: entityType price_version, create only (append-only, effective-dated).
+      required: [productId, priceType, amountPaise, effectiveFrom]
+      properties:
+        productId: { type: string, format: uuid }
+        priceType: { type: string, enum: [mrp, retail, wholesale, purchase] }
+        amountPaise: { type: integer, format: int64, minimum: 0 }
+        effectiveFrom: { type: string, format: date-time }
+    PartyPayload:
+      type: object
+      description: |
+        entityType party. create needs name. Field-level merge like product. A phone or GSTIN already held by
+        another party is flagged (party_identity_conflict), never rejected or auto-merged.
+      properties:
+        name: { type: string }
+        partyType: { type: string, enum: [customer, supplier, both] }
+        phone: { type: [string, 'null'] }
+        gstin: { type: [string, 'null'] }
+        creditLimitPaise: { type: [integer, 'null'], format: int64, minimum: 0 }
+        active: { type: boolean }
+    PartyMergePayload:
+      type: object
+      description: entityType party_merge, create only. First merge wins; a conflicting later merge is recorded unapplied and flagged.
+      required: [sourcePartyId, targetPartyId]
+      properties:
+        sourcePartyId: { type: string, format: uuid }
+        targetPartyId: { type: string, format: uuid }
+        reason: { type: string }
+    StockMovementPayload:
+      type: object
+      description: |
+        entityType stock_movement, create only. qtyMilli is a signed delta (sale = negative). Balance is the sum
+        of movements and may go negative: stock shows the shortfall and an `oversold` flag.
+      required: [productId, qtyMilli, reason]
+      properties:
+        productId: { type: string, format: uuid }
+        qtyMilli: { type: integer, format: int64, description: 'Signed, non-zero' }
+        reason: { type: string, enum: [opening, sale, purchase, sale_return, purchase_return, adjustment, transfer_in, transfer_out, damage] }
+        refType: { type: string }
+        refId: { type: string, format: uuid }
+        occurredAt: { type: string, format: date-time }
+    InvoiceLine:
+      type: object
+      required: [productId, qtyMilli, unitPricePaise, lineTotalPaise]
+      properties:
+        productId: { type: string, format: uuid }
+        qtyMilli: { type: integer, format: int64, minimum: 1 }
+        unitPricePaise: { type: integer, format: int64, minimum: 0 }
+        discountPaise: { type: integer, format: int64, minimum: 0, default: 0 }
+        hsn: { type: [string, 'null'] }
+        taxRateBp: { type: integer, minimum: 0, maximum: 10000, default: 0 }
+        taxPaise: { type: integer, format: int64, minimum: 0, default: 0 }
+        lineTotalPaise: { type: integer, format: int64, description: 'Line amount including tax, after line discount' }
+    InvoicePayload:
+      type: object
+      description: |
+        entityType invoice, create only: finalised invoices are immutable (corrections are credit notes). Totals:
+        sum(lines.lineTotalPaise) = subtotalPaise + taxPaise and subtotalPaise + taxPaise - discountPaise +
+        roundOffPaise = totalPaise; a mismatch is flagged, not rejected. A discount or backdated bill needs `approval`.
+      required: [series, number, docType, invoiceDate, subtotalPaise, totalPaise, lines]
+      properties:
+        series: { type: string, description: 'Device-scoped number series, e.g. C1-2026-27' }
+        number: { type: integer, format: int64, minimum: 1 }
+        docType: { type: string, enum: [tax_invoice, bill_of_supply, retail_invoice] }
+        invoiceDate: { type: string, format: date }
+        partyId: { type: [string, 'null'], format: uuid }
+        subtotalPaise: { type: integer, format: int64 }
+        discountPaise: { type: integer, format: int64, minimum: 0, default: 0 }
+        taxPaise: { type: integer, format: int64, minimum: 0, default: 0 }
+        roundOffPaise: { type: integer, format: int64, default: 0 }
+        totalPaise: { type: integer, format: int64, minimum: 0 }
+        approval: { $ref: '#/components/schemas/Approval' }
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: { $ref: '#/components/schemas/InvoiceLine' }
+    CreditNotePayload:
+      type: object
+      description: entityType credit_note, create only. Reason is mandatory; the owner's approval is expected.
+      required: [series, number, invoiceId, reason, totalPaise]
+      properties:
+        series: { type: string }
+        number: { type: integer, format: int64, minimum: 1 }
+        invoiceId: { type: string, format: uuid }
+        partyId: { type: [string, 'null'], format: uuid }
+        reason: { type: string, minLength: 1 }
+        totalPaise: { type: integer, format: int64, minimum: 1 }
+        lines: { type: array, items: { type: object, additionalProperties: true } }
+        approval: { $ref: '#/components/schemas/Approval' }
+    PurchaseReceiptPayload:
+      type: object
+      description: entityType purchase_receipt, create only.
+      required: [series, number, receiptDate, totalPaise]
+      properties:
+        series: { type: string }
+        number: { type: integer, format: int64, minimum: 1 }
+        supplierId: { type: [string, 'null'], format: uuid }
+        supplierRef: { type: [string, 'null'] }
+        receiptDate: { type: string, format: date }
+        totalPaise: { type: integer, format: int64, minimum: 0 }
+        lines: { type: array, items: { type: object, additionalProperties: true } }
+    OrderPayload:
+      type: object
+      description: entityType order, create only; afterwards state changes only through order_transition.
+      properties:
+        partyId: { type: [string, 'null'], format: uuid }
+        state: { type: string, enum: [draft, confirmed], default: draft }
+    OrderTransitionPayload:
+      type: object
+      description: |
+        entityType order_transition, create only. Legal: draft->confirmed|cancelled, confirmed->packed|cancelled,
+        packed->dispatched|cancelled, dispatched->delivered, delivered->returned. An illegal one is recorded and
+        flagged (order_transition_conflict), never applied.
+      required: [orderId, toState]
+      properties:
+        orderId: { type: string, format: uuid }
+        toState: { type: string, enum: [draft, confirmed, packed, dispatched, delivered, cancelled, returned] }
+        reason: { type: string }
+    PaymentPayload:
+      type: object
+      description: entityType payment, create only (append-only).
+      required: [direction, mode, amountPaise]
+      properties:
+        partyId: { type: [string, 'null'], format: uuid }
+        invoiceId: { type: [string, 'null'], format: uuid }
+        direction: { type: string, enum: ['in', 'out'] }
+        mode: { type: string, enum: [cash, upi, card, bank_transfer, cheque, other] }
+        amountPaise: { type: integer, format: int64, minimum: 1 }
+        reference: { type: string }
+        occurredAt: { type: string, format: date-time }
+    KhataEntryPayload:
+      type: object
+      description: |
+        entityType khata_entry, create only (append-only). debit = party owes more; credit = party paid.
+        Balance = sum(debit) - sum(credit), a projection.
+      required: [partyId, direction, amountPaise]
+      properties:
+        partyId: { type: string, format: uuid }
+        direction: { type: string, enum: [debit, credit] }
+        amountPaise: { type: integer, format: int64, minimum: 1 }
+        refType: { type: string }
+        refId: { type: string, format: uuid }
+        note: { type: string }
+        occurredAt: { type: string, format: date-time }

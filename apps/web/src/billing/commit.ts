@@ -191,7 +191,7 @@ export async function commitSale(writer: OpLogWriter, db: Pick<LocalDb, 'getAll'
             invoiceDate,
             partyId,
             subtotalPaise: bill.subtotalPaise,
-            discountPaise: 0, // ADR 0006: discounts live in the lines, the header equation stays exact
+            discountPaise: 0, // ADR 0009: discounts live in the lines, the header equation stays exact
             taxPaise: bill.taxPaise,
             roundOffPaise: bill.roundOffPaise,
             totalPaise: bill.totalPaise,

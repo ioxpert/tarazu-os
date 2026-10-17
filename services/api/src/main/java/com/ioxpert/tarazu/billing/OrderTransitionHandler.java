@@ -37,6 +37,11 @@ class OrderTransitionHandler implements EntityOperationHandler {
 	}
 
 	@Override
+	public boolean registersEntity() {
+		return false;
+	}
+
+	@Override
 	public String entityType() {
 		return "order_transition";
 	}

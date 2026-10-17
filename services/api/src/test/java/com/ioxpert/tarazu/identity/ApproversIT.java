@@ -21,7 +21,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import tools.jackson.databind.JsonNode;
 
-/** Offline owner approval (ADR 0005): the verifiers a device caches, and the business/store the device learns from /me. */
+/** Offline owner approval (ADR 0008): the verifiers a device caches, and the business/store the device learns from /me. */
 class ApproversIT extends ApiIT {
 
 	private MockHttpServletRequestBuilder asOwner(MockHttpServletRequestBuilder req, Seed seed) {

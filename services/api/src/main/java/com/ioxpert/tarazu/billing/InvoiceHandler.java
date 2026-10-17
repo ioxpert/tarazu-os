@@ -147,7 +147,7 @@ class InvoiceHandler implements EntityOperationHandler {
 		}
 
 		// A discount within the unapproved band (default 5% of gross, the same default the counter enforces locally)
-		// is a cashier's call; only a larger one needs the owner PIN. See ADR 0006.
+		// is a cashier's call; only a larger one needs the owner PIN. See ADR 0009.
 		long gross = lines.stream().mapToLong(l -> (l.qtyMilli() * l.unitPricePaise() + 500) / 1000).sum();
 		long lineDiscounts = lines.stream().mapToLong(Line::discountPaise).sum() + discount;
 		boolean discounted = lineDiscounts > 0 && lineDiscounts * 10_000 > gross * maxUnapprovedDiscountBp;

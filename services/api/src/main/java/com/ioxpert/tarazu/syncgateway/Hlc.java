@@ -18,7 +18,32 @@ public record Hlc(Instant instant, int counter, String node, String raw) impleme
 		if (m == null || !m.matches()) {
 			throw new IllegalArgumentException("Malformed HLC: " + raw);
 		}
-		return new Hlc(Instant.parse(m.group(1)), Integer.parseInt(m.group(2), 16), m.group(3), raw);
+		try {
+			return new Hlc(Instant.parse(m.group(1)), Integer.parseInt(m.group(2), 16), m.group(3), raw);
+		}
+		catch (java.time.format.DateTimeParseException ex) {
+			throw new IllegalArgumentException("Impossible HLC date: " + raw, ex);
+		}
+	}
+
+	/** Largest amount a device clock may run ahead of the server before its writes are treated as received "now". */
+	public static final java.time.Duration MAX_FUTURE_DRIFT = java.time.Duration.ofHours(24);
+
+	public boolean isSkewedAt(Instant receivedAt) {
+		return instant.isAfter(receivedAt.plus(MAX_FUTURE_DRIFT));
+	}
+
+	/**
+	 * The clock to use when merging. A device whose clock is far in the future (wrong date, dead RTC battery) would
+	 * otherwise win every field-level merge for years; its writes count as made at the moment they arrived instead.
+	 */
+	public Hlc effectiveAt(Instant receivedAt) {
+		if (!isSkewedAt(receivedAt)) {
+			return this;
+		}
+		String clamped = "%s-%04x-%s".formatted(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+				.withZone(java.time.ZoneOffset.UTC).format(receivedAt), counter, node);
+		return new Hlc(receivedAt.truncatedTo(java.time.temporal.ChronoUnit.MILLIS), counter, node, clamped);
 	}
 
 	@Override

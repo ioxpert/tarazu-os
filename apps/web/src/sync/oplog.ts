@@ -148,8 +148,13 @@ export class OpLogWriter {
         seq++
       }
 
-      await tx.execute('INSERT OR REPLACE INTO device_state (id, value) VALUES (?, ?)', [KEY_NEXT_SEQ, String(seq)])
-      await tx.execute('INSERT OR REPLACE INTO device_state (id, value) VALUES (?, ?)', [KEY_LAST_HLC, format(hlc!)])
+      // one statement: every round trip to the database worker costs on a cheap Android phone
+      await tx.execute('INSERT OR REPLACE INTO device_state (id, value) VALUES (?, ?), (?, ?)', [
+        KEY_NEXT_SEQ,
+        String(seq),
+        KEY_LAST_HLC,
+        format(hlc!),
+      ])
       return written
     })
   }

@@ -1,4 +1,4 @@
-# ADR 0005: Offline owner approval with cached PBKDF2 verifiers
+# ADR 0008: Offline owner approval with cached PBKDF2 verifiers
 
 Status: accepted (17 Oct 2026)
 

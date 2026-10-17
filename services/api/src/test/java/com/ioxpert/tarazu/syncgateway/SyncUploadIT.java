@@ -116,6 +116,20 @@ class SyncUploadIT extends ApiIT {
 	}
 
 	@Test
+	void anOperationWaitingForAParentThatNeverComesBecomesAReviewFlag() throws Exception {
+		Seed seed = seedTenant();
+		var device = new Ops(seed);
+		UUID missing = UUID.randomUUID();
+		var res = upload(seed, device.stock(UUID.randomUUID(), missing, 1000, "purchase"));
+		assertThat(statusOf(res, 0)).isEqualTo("deferred");
+		inTenant(seed.tenant(), () -> jdbc.update("UPDATE operation_result SET updated_at = now() - interval '4 days'"));
+
+		upload(seed, device.product(UUID.randomUUID(), "Unrelated, but its arrival triggers the sweep"));
+		assertThat(count(seed, "SELECT count(*) FROM conflict_flag WHERE kind = 'stuck_operation' AND status = 'open'")).isEqualTo(1);
+		assertThat(count(seed, "SELECT count(*) FROM operation_result WHERE status = 'deferred'")).as("still parked, now visible").isEqualTo(1);
+	}
+
+	@Test
 	void parentAndChildInOneBatchInReverseOrderBothApply() throws Exception {
 		Seed seed = seedTenant();
 		var device = new Ops(seed);
@@ -146,6 +160,37 @@ class SyncUploadIT extends ApiIT {
 		uploadRaw(seed.tenant(), List.of(notV7)).andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("invalid_operation_id"));
 		assertThat(count(seed, "SELECT count(*) FROM operation_log")).isZero();
+	}
+
+	@Test
+	void hostileInputIsContainedPerOperationOrRefusedCleanlyNeverA500() throws Exception {
+		Seed seed = seedTenant();
+		var d = new Ops(seed);
+		UUID id = UUID.randomUUID();
+		// NUL characters cannot be stored in Postgres text/jsonb; they are replaced, the op still applies
+		var res = upload(seed, d.create("product", id, Ops.m("name", "a\u0000b")));
+		assertThat(statusOf(res, 0)).isEqualTo("applied");
+		assertThat(inTenant(seed.tenant(), () -> jdbc.queryForObject("SELECT name FROM product WHERE id = ?", String.class, id))).isEqualTo("a\uFFFDb");
+
+		var badHlc = new java.util.LinkedHashMap<>(d.product(UUID.randomUUID(), "x"));
+		badHlc.put("hlc", "2026-13-45T10:00:00.000Z-0000-abc");
+		uploadRaw(seed.tenant(), List.of(badHlc)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("invalid_hlc"));
+
+		mvc.perform(post("/v1/sync/flags/" + UUID.randomUUID() + "/resolve").header("X-Tenant-Id", seed.tenant()).header("X-Staff-Id", seed.owner())
+				.contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"x\"}")).andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void theSameOperationIdTwiceInOneBatchIsOneOperation() throws Exception {
+		Seed seed = seedTenant();
+		var d = new Ops(seed);
+		var first = d.product(UUID.randomUUID(), "one");
+		var second = new java.util.LinkedHashMap<>(d.product(UUID.randomUUID(), "two"));
+		second.put("operationId", first.get("operationId"));
+		var res = upload(seed, List.of(first, second));
+		assertThat(statusOf(res, 0)).isEqualTo("applied");
+		assertThat(statusOf(res, 1)).isEqualTo("duplicate");
+		assertThat(count(seed, "SELECT count(*) FROM product")).isEqualTo(1);
 	}
 
 	@Test

@@ -1,4 +1,4 @@
-# ADR 0006: Billing totals, tax, returns, cash shifts and the product master
+# ADR 0009: Billing totals, tax, returns, cash shifts and the product master
 
 Status: accepted (17 Oct 2026)
 

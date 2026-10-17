@@ -205,6 +205,20 @@ class IdentityIT extends ApiIT {
 	}
 
 	@Test
+	void aManagerCannotTakeOverAnOwnerAccount() throws Exception {
+		Seed seed = seedTenant();
+		UUID manager = addUser(seed, "manager");
+		for (var req : List.of(
+				put("/v1/identity/users/" + seed.owner() + "/pin").content(body(Map.of("pin", "1234", "reason", "x"))),
+				put("/v1/identity/users/" + seed.owner()).content(body(Map.of("displayName", "Owner", "status", "disabled"))),
+				put("/v1/identity/users/" + seed.owner() + "/roles").content(body(Map.of("roles", List.of(Map.of("role", "owner", "storeId", seed.store())), "reason", "x"))))) {
+			mvc.perform(req.header("X-Tenant-Id", seed.tenant()).header("X-Staff-Id", manager).contentType(MediaType.APPLICATION_JSON))
+					.andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("owner_only"));
+		}
+		assertThat(count(seed, "SELECT count(*) FROM app_user WHERE id = ? AND pin_hash IS NULL AND status = 'active'", seed.owner())).isEqualTo(1);
+	}
+
+	@Test
 	void theBusinessGstModeIsSetByTheOwnerAndAuditedAndTheHierarchyIsEnforced() throws Exception {
 		Seed seed = seedTenant();
 		UUID business = UUID.randomUUID();
@@ -214,8 +228,11 @@ class IdentityIT extends ApiIT {
 		UUID store = UUID.randomUUID();
 		mvc.perform(asOwner(put("/v1/identity/stores/" + store), seed).content(body(Map.of("businessId", business, "name", "Godown"))))
 				.andExpect(status().isOk());
+		mvc.perform(asOwner(get("/v1/identity/stores"), seed)).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(2));
 		mvc.perform(asOwner(put("/v1/identity/stores/" + UUID.randomUUID()), seed).content(body(Map.of("businessId", UUID.randomUUID(), "name", "Orphan"))))
 				.andExpect(status().isUnprocessableEntity());
+		mvc.perform(asOwner(put("/v1/identity/stores/" + store), seed).content(body(Map.of("businessId", seed.business(), "name", "Moved"))))
+				.andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("store_business_immutable"));
 		mvc.perform(asOwner(put("/v1/identity/businesses/" + business), seed).content(body(Map.of("name", "x", "gstMode", "bogus"))))
 				.andExpect(status().isBadRequest());
 		assertThat(count(seed, "SELECT count(*) FROM audit_log WHERE action = 'business.gst_mode_set' AND entity_id = ?", business)).isEqualTo(1);

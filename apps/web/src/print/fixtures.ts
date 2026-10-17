@@ -1,6 +1,6 @@
 import type { ReceiptData, ReceiptLine } from '../billing/types'
 
-/** Test-only sample receipts (not imported by the app). Amounts in paise, consistent with ADR 0006 maths. */
+/** Test-only sample receipts (not imported by the app). Amounts in paise, consistent with ADR 0009 maths. */
 const biz = {
   businessName: 'Sharma General Store',
   gstin: '27ABCDE1234F1Z5',

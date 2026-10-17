@@ -69,7 +69,7 @@ function checkLine(l: CartLine): void {
  *   exclusive: tax = round(net * r / 10000), taxable = net, lineTotal = net + tax.
  * composition / non_gst merchants charge 0 tax. Header: subtotal = sum(taxable), tax = sum(tax),
  * roundOff to the nearest rupee (-50..+50), total = subtotal + tax + roundOff. Invariants (property-tested):
- * sum(lineTotal) = subtotal + tax and subtotal + tax + roundOff = total (ADR 0006: header discount is 0).
+ * sum(lineTotal) = subtotal + tax and subtotal + tax + roundOff = total (ADR 0009: header discount is 0).
  * An empty cart prices to zero; a non-positive / fractional quantity or negative price throws a BillingError.
  */
 export function priceCart(cart: Pick<Cart, 'lines' | 'billDiscount'>, ctx: PricingContext): PricedBill {

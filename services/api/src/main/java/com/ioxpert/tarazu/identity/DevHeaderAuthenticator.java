@@ -25,7 +25,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 @Order(Ordered.LOWEST_PRECEDENCE)
-@ConditionalOnProperty(DevHeaderProperties.ENABLED)
+@ConditionalOnProperty(name = DevHeaderProperties.ENABLED, havingValue = "true")
 class DevHeaderAuthenticator implements RequestAuthenticator {
 
 	private final AccessPolicy access;

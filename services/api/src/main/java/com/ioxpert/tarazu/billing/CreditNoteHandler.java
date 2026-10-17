@@ -41,6 +41,11 @@ class CreditNoteHandler implements EntityOperationHandler {
 	}
 
 	@Override
+	public boolean registersEntity() {
+		return false;
+	}
+
+	@Override
 	public String entityType() {
 		return "credit_note";
 	}

@@ -14,7 +14,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Read-only lookup in the platform product master: global reference data, identical for every merchant, loaded by
- * ops (docs/adr/0006). Lets the add-item form pre-fill from a barcode the device has never seen.
+ * ops (docs/adr/0009). Lets the add-item form pre-fill from a barcode the device has never seen.
  */
 @RestController
 @RequestMapping("/v1/catalogue")

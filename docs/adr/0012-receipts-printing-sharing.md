@@ -1,4 +1,4 @@
-# ADR 0009: Receipts, printing and sharing
+# ADR 0012: Receipts, printing and sharing
 
 Status: accepted (17 Oct 2026)
 

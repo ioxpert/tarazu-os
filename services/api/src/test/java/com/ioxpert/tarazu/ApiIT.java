@@ -26,7 +26,8 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@TestPropertySource(properties = { "tarazu.auth.dev-header-enabled=true", "tarazu.pin.iterations=1000" })
+@TestPropertySource(properties = { "tarazu.auth.dev-header-enabled=true", "tarazu.pin.iterations=1000",
+		"tarazu.auth.otp.pepper=test-pepper-0123456789abcdef", "tarazu.auth.otp.resend-seconds=0", "tarazu.auth.otp.max-per-hour=1000" })
 public abstract class ApiIT extends AbstractPostgresIT {
 
 	@Autowired protected MockMvc mvc;
@@ -56,6 +57,11 @@ public abstract class ApiIT extends AbstractPostgresIT {
 		inTenant(seed.tenant(), () -> jdbc.update("INSERT INTO device (id, tenant_id, store_id, label) VALUES (?, ?, ?, 'Counter')",
 				id, seed.tenant(), seed.store()));
 		return id;
+	}
+
+	/** Public hook for helpers in other packages. */
+	public UUID addDeviceForTest(Seed seed) {
+		return addDevice(seed);
 	}
 
 	protected UUID addUser(Seed seed, String role) {

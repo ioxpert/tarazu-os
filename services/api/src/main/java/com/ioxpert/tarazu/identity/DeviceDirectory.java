@@ -34,6 +34,10 @@ public class DeviceDirectory {
 	}
 
 	public void markSeen(UUID deviceId) {
-		jdbc.sql("UPDATE device SET last_seen_at = now() WHERE id = :id").param("id", deviceId).update();
+		// at most once a minute: a hot row updated by every upload would serialise a device's concurrent batches
+		jdbc.sql("""
+				UPDATE device SET last_seen_at = now()
+				WHERE id = :id AND (last_seen_at IS NULL OR last_seen_at < now() - interval '1 minute')
+				""").param("id", deviceId).update();
 	}
 }

@@ -8,6 +8,19 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        // The four SQLite WASM builds are 1-2.5 MB each and only one is used, so they are NOT precached (that would
+        // download ~8 MB on every install). They are cached on first use instead: a device that has started the
+        // sync runtime once has the engine offline from then on. JS chunks (incl. the lazy sync chunk) are precached.
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.endsWith('.wasm'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'sqlite-wasm', expiration: { maxEntries: 6 } },
+          },
+        ],
+      },
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'Tarazu OS',
@@ -25,6 +38,10 @@ export default defineConfig({
       },
     }),
   ],
+  // PowerSync / wa-sqlite load their own workers and .wasm via `new URL(..., import.meta.url)`: keep them out of
+  // dependency pre-bundling, and build workers as ES modules (they use dynamic import and top-level await).
+  optimizeDeps: { exclude: ['@journeyapps/wa-sqlite', '@powersync/web'] },
+  worker: { format: 'es' },
   server: {
     // API runs on :8080 in dev; the browser only ever talks to same-origin /api
     proxy: { '/api': { target: 'http://localhost:8080', rewrite: (p) => p.replace(/^\/api/, '') } },

@@ -1,0 +1,27 @@
+# Example PowerSync service config for local development.  NOT exercised in CI. Check keys against the
+# PowerSync self-host docs for the service version you run (https://docs.powersync.com/self-hosting).
+replication:
+  connections:
+    - type: postgresql
+      uri: postgresql://powersync_repl:powersync_repl_dev@host.docker.internal:5432/tarazu
+      sslmode: disable
+
+storage:
+  type: postgresql          # bucket storage in its own database (or use mongodb)
+  uri: postgresql://powersync_storage:powersync_storage_dev@host.docker.internal:5432/powersync_storage
+  sslmode: disable
+
+port: 8081
+
+sync_rules:
+  path: /config/sync-rules.yaml
+
+client_auth:
+  # HS256 secret shared with the API: tarazu.sync.powersync.secret (POWERSYNC_JWT_SECRET), base64url.
+  jwks:
+    keys:
+      - kty: oct
+        alg: HS256
+        kid: tarazu-1
+        k: REPLACE_WITH_BASE64URL_SECRET
+  audience: ["http://localhost:8081"]   # = tarazu.sync.powersync.audience (defaults to the PowerSync URL)

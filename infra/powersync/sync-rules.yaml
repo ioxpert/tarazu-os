@@ -1,0 +1,41 @@
+# PowerSync sync rules for Tarazu OS.  DRAFT: NOT exercised in CI (no PowerSync service runs there).
+# Validate with the PowerSync dashboard / CLI against a real service before relying on it.
+#
+# Bucket key = merchant_id (= our tenant id), taken from the device JWT minted by GET /v1/sync/credentials
+# (claim `merchant_id`). One bucket per merchant: every device of a merchant downloads the same read model.
+# Writes never go through PowerSync: devices upload operations to POST /v1/sync/upload (see TarazuConnector).
+#
+# Column lists must match apps/web/src/sync/schema.ts (READ_MODEL_TABLES). PowerSync needs a text `id`;
+# tables with composite keys get a synthetic one, and the web schema documents the same recipe.
+bucket_definitions:
+  by_merchant:
+    parameters: SELECT request.jwt() ->> 'merchant_id' AS merchant_id
+    data:
+      - SELECT id, tenant_id, name, barcode, sku, hsn, unit, active, updated_at
+        FROM product WHERE tenant_id = bucket.merchant_id
+      - SELECT id, tenant_id, name, party_type, phone, gstin, credit_limit_paise, active, merged_into, updated_at
+        FROM party WHERE tenant_id = bucket.merchant_id
+      - SELECT id, tenant_id, product_id, price_type, amount_paise, effective_from, hlc
+        FROM price_version WHERE tenant_id = bucket.merchant_id
+      # projection: id = store_id:product_id
+      - SELECT store_id || ':' || product_id AS id, tenant_id, store_id, product_id, qty_milli, oversold, movement_count
+        FROM stock_balance WHERE tenant_id = bucket.merchant_id
+      # projection: id = party_id
+      - SELECT party_id AS id, tenant_id, party_id, balance_paise, entry_count
+        FROM khata_balance WHERE tenant_id = bucket.merchant_id
+      - SELECT id, tenant_id, store_id, device_id, series, number, doc_type, invoice_date, party_id, subtotal_paise,
+               discount_paise, tax_paise, round_off_paise, total_paise, hlc, created_at
+        FROM invoice WHERE tenant_id = bucket.merchant_id
+      # id = invoice_id:line_no
+      - SELECT invoice_id || ':' || line_no AS id, tenant_id, invoice_id, line_no, product_id, qty_milli,
+               unit_price_paise, discount_paise, hsn, tax_rate_bp, tax_paise, line_total_paise
+        FROM invoice_line WHERE tenant_id = bucket.merchant_id
+      - SELECT id, tenant_id, store_id, party_id, invoice_id, direction, mode, amount_paise, reference, occurred_at
+        FROM payment WHERE tenant_id = bucket.merchant_id
+      - SELECT id, tenant_id, store_id, party_id, state, updated_at
+        FROM sales_order WHERE tenant_id = bucket.merchant_id
+
+  # Global reference data (no parameters = one bucket every device gets). Rate changes reach devices without an app release.
+  global_tax_rules:
+    data:
+      - SELECT id, hsn_prefix, description, rate_bp, cess_bp, effective_from, notification_ref FROM tax_rule

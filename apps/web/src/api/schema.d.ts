@@ -32,10 +32,455 @@ export interface paths {
         put?: never;
         /**
          * Upload a batch from the device outbox (PowerSync uploadData)
-         * @description Idempotent. Replaying a batch is safe: rows with a known idempotencyKey or operationId are
-         *     counted as duplicates. The batch is atomic; a 422 means nothing was stored.
+         * @description Every operation is stored in the immutable operation log, applied under its entity's conflict
+         *     policy, and acknowledged in `results` (same order as the request). Per-operation problems never fail
+         *     the request: a permanently invalid operation is `rejected` (kept raw in the log), one whose parent entity
+         *     has not arrived is `deferred` and applied automatically when it does, a policy violation on a sale that
+         *     already happened is applied and `flagged`. Replaying a batch is safe: known operations come back as
+         *     `duplicate`. Whole-request failures (400, 403, 422) store nothing.
          */
         post: operations["uploadOperations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sync/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the server made of this device's operations
+         * @description Counts for the calling device (whole tenant when called without a device credential).
+         */
+        get: operations["getSyncStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sync/rejected": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Operations the server rejected (action required on the device) */
+        get: operations["listRejectedOperations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sync/flags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Review queue (oversold stock, party clashes, missing approvals, ...) */
+        get: operations["listConflictFlags"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sync/flags/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve or dismiss a review flag (owner or manager) */
+        post: operations["resolveConflictFlag"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sync/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Short-lived token for the self-hosted PowerSync service
+         * @description Used by the PowerSync connector's fetchCredentials(). 503 when PowerSync is not configured.
+         */
+        get: operations["getSyncCredentials"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/identity/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Who the server thinks is calling */
+        get: operations["getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/identity/businesses/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Create or update a business (owner). GST mode changes are audited. */
+        put: operations["putBusiness"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/identity/stores/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Create or rename a store (owner) */
+        put: operations["putStore"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/identity/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Registered devices */
+        get: operations["listDevices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/identity/devices/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Register a device and receive its credential (shown once)
+         * @description Idempotent on the client-chosen device id. 201 with `token` on first registration; a replay is 200 without
+         *     a token (the secret is never shown again; revoke and register a new device if it was lost).
+         */
+        put: operations["registerDevice"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/identity/devices/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke a device; it is refused at its next request */
+        post: operations["revokeDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/identity/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Staff users */
+        get: operations["listUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/identity/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One staff user */
+        get: operations["getUser"];
+        /** Create or update a staff user (idempotent on the client-chosen id) */
+        put: operations["putUser"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/identity/users/{id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Replace a user's roles. Only an owner can grant or remove owner; the last owner cannot be removed. */
+        put: operations["putUserRoles"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/identity/users/{id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set a staff member's PIN (4-8 digits) */
+        put: operations["putUserPin"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/identity/users/{id}/pin/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check a PIN (counts failures; locks after five misses) */
+        post: operations["verifyUserPin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/identity/audit-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Audit trail (actor, action, reason, timestamp), newest first */
+        get: operations["listAuditLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/consent/purposes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The closed list of consent purposes (none is pre-selected) */
+        get: operations["listConsentPurposes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/consent/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record a grant or a withdrawal (idempotent on operationId / idempotencyKey) */
+        post: operations["recordConsentEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/consent/subjects/{subjectType}/{subjectId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Current consent per purpose, plus the full history */
+        get: operations["getSubjectConsent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/consent/sharing-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Third-party disclosures */
+        get: operations["listSharingLog"];
+        put?: never;
+        /** Log a disclosure. Refused unless consent is currently granted and the merchant is not local-only. */
+        post: operations["logThirdPartySharing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/consent/mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Is this merchant in local-only mode? */
+        get: operations["getDataMode"];
+        /** Switch local-only mode on or off (owner). While on, uploads and sharing are refused. */
+        put: operations["setDataMode"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tax/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Change feed of GST rule rows (id > sinceId, oldest first)
+         * @description Poll with the returned `maxId`. Rules are effective-dated; a rate change is a new row.
+         */
+        get: operations["listTaxRules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tax/rules/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The rule in force for an HSN code on a date (most specific prefix, latest effective date) */
+        get: operations["resolveTaxRule"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tax/thresholds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GST thresholds in force on a date (latest per key) */
+        get: operations["listTaxThresholds"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -50,48 +495,660 @@ export interface components {
             /** @example UP */
             status: string;
         };
+        Problem: {
+            title?: string;
+            status?: number;
+            detail?: string;
+            /** @description Stable reason, e.g. device_revoked, invalid_token, permission_denied, local_only_mode, consent_not_granted. */
+            code?: string;
+        };
+        /**
+         * @description One client-side write from the device's operation log. `payload` depends on `entityType`; see the
+         *     `*Payload` schemas (ProductPayload, StockMovementPayload, ...).
+         */
         Operation: {
             /**
              * Format: uuid
-             * @description UUIDv7
+             * @description UUIDv7 (version 7 is enforced).
              */
             operationId: string;
             /** Format: uuid */
             storeId: string;
             /** Format: uuid */
             deviceId: string;
-            /** Format: int64 */
+            /**
+             * Format: uuid
+             * @description Staff member who did it (device-asserted; audited, not trusted for access control).
+             */
+            actorUserId?: string | null;
+            /**
+             * Format: int64
+             * @description Per-device, strictly increasing.
+             */
             localSeq: number;
-            /** @description Hybrid logical clock */
+            /** @description Hybrid logical clock: UTC millis, 4-hex counter, node id. Example 2026-10-17T10:00:00.000Z-0000-a1b2c3d4 */
             hlc: string;
+            /** @description Unique per tenant; use deviceId:localSeq. */
             idempotencyKey: string;
+            /**
+             * @example product
+             * @example price_version
+             * @example party
+             * @example party_merge
+             * @example stock_movement
+             * @example invoice
+             * @example credit_note
+             * @example purchase_receipt
+             * @example order
+             * @example order_transition
+             * @example payment
+             * @example khata_entry
+             */
             entityType: string;
             /** Format: uuid */
             entityId: string;
             /** @enum {string} */
             opType: "create" | "update" | "void";
             schemaVersion: number;
-            payload: {
-                [key: string]: unknown;
-            };
+            /** @description Shape depends on entityType; the first matching schema documents it. */
+            payload: components["schemas"]["ProductPayload"] | components["schemas"]["PriceVersionPayload"] | components["schemas"]["PartyPayload"] | components["schemas"]["PartyMergePayload"] | components["schemas"]["StockMovementPayload"] | components["schemas"]["InvoicePayload"] | components["schemas"]["CreditNotePayload"] | components["schemas"]["PurchaseReceiptPayload"] | components["schemas"]["OrderPayload"] | components["schemas"]["OrderTransitionPayload"] | components["schemas"]["PaymentPayload"] | components["schemas"]["KhataEntryPayload"];
         };
         UploadRequest: {
             operations: components["schemas"]["Operation"][];
         };
-        UploadResponse: {
-            /** @description Newly stored */
-            accepted: number;
-            /** @description Already stored */
-            duplicates: number;
+        OperationResult: {
+            /** Format: uuid */
+            operationId: string;
+            /**
+             * @description applied; flagged = applied but needs review; deferred = stored, waiting for a parent entity (applied
+             *     automatically later, nothing to resend); rejected = stored, not applied (see code; action required);
+             *     duplicate = already known (see originalStatus).
+             * @enum {string}
+             */
+            status: "applied" | "flagged" | "deferred" | "rejected" | "duplicate";
+            /** @description For duplicate, the operation's current status. */
+            originalStatus?: string | null;
+            /**
+             * @description rejected: invalid_payload, unknown_entity_type, unsupported_schema_version, immutable_document, append_only,
+             *     duplicate_invoice_number, integrity_violation. flagged: comma-separated flag kinds. deferred: missing_dependency.
+             */
+            code?: string | null;
+            message?: string | null;
         };
-        Problem: {
-            title?: string;
-            status?: number;
-            detail?: string;
+        UploadResponse: {
+            /** @description Newly stored this call (any outcome) */
+            accepted: number;
+            /** @description Already stored, ignored */
+            duplicates: number;
+            rejected: number;
+            deferred: number;
+            flagged: number;
+            /** @description One acknowledgement per request operation, same order. */
+            results: components["schemas"]["OperationResult"][];
+        };
+        SyncStatus: {
+            /** Format: int64 */
+            applied: number;
+            /** Format: int64 */
+            flagged: number;
+            /** Format: int64 */
+            deferred: number;
+            /** Format: int64 */
+            rejected: number;
+            /**
+             * Format: int64
+             * @description Open review flags for the whole tenant
+             */
+            openFlags: number;
+            /** Format: date-time */
+            lastOperationAt?: string | null;
+        };
+        RejectedOperation: {
+            /** Format: uuid */
+            operationId: string;
+            entityType: string;
+            /** Format: uuid */
+            entityId: string;
+            code?: string | null;
+            detail?: string | null;
+        };
+        ConflictFlag: {
+            /** Format: uuid */
+            id: string;
+            /** @description oversold, party_identity_conflict, invalid_gstin, party_merge_conflict, order_transition_conflict, approval_required, total_mismatch, tax_rate_mismatch, composition_requires_bill_of_supply, composition_tax_charged, tax_invoice_without_gst_registration, credit_exceeds_invoice, permission_violation, unknown_actor */
+            kind: string;
+            entityType?: string | null;
+            /** Format: uuid */
+            entityId?: string | null;
+            /** Format: uuid */
+            operationId?: string | null;
+            /** @enum {string} */
+            status: "open" | "resolved" | "dismissed";
+            detail: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            resolvedAt?: string | null;
+            resolutionNote?: string | null;
+        };
+        ResolveFlagRequest: {
+            /** @enum {string} */
+            status: "resolved" | "dismissed";
+            note: string;
+        };
+        SyncCredentials: {
+            /** @description PowerSync service URL */
+            endpoint: string;
+            /** @description HS256 JWT; claims sub=deviceId, merchant_id (bucket key), store_id, device_id */
+            token: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        Me: {
+            /** Format: uuid */
+            tenantId: string;
+            /** Format: uuid */
+            deviceId?: string | null;
+            /** Format: uuid */
+            storeId?: string | null;
+            /** Format: uuid */
+            userId?: string | null;
+            roles: components["schemas"]["Role"][];
+        };
+        /** @enum {string} */
+        Role: "owner" | "manager" | "cashier" | "purchaser" | "accountant" | "sales_rep" | "delivery_agent";
+        /**
+         * @description composition merchants issue a bill of supply; non_gst is unregistered.
+         * @enum {string}
+         */
+        GstMode: "regular" | "composition" | "non_gst";
+        BusinessRequest: {
+            name: string;
+            gstMode: components["schemas"]["GstMode"];
+            gstin?: string | null;
+            stateCode?: string | null;
+        };
+        Business: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            gstMode: components["schemas"]["GstMode"];
+            gstin?: string | null;
+            stateCode?: string | null;
+        };
+        StoreRequest: {
+            /** Format: uuid */
+            businessId: string;
+            name: string;
+        };
+        Store: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            businessId: string;
+            name: string;
+        };
+        DeviceRequest: {
+            /** Format: uuid */
+            storeId: string;
+            label?: string | null;
+        };
+        DeviceRegistered: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            storeId: string;
+            label?: string | null;
+            /** @description The device credential. Present only on first registration (201); store it securely. */
+            token?: string | null;
+        };
+        Device: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            storeId: string;
+            label?: string | null;
+            /** @enum {string} */
+            status: "active" | "revoked";
+            /** Format: date-time */
+            lastSeenAt?: string | null;
+            /** Format: date-time */
+            revokedAt?: string | null;
+            revokeReason?: string | null;
+        };
+        ReasonRequest: {
+            reason: string;
+        };
+        UserRequest: {
+            displayName: string;
+            phone?: string | null;
+            /**
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "disabled";
+        };
+        RoleGrant: {
+            role: components["schemas"]["Role"];
+            /**
+             * Format: uuid
+             * @description Scope the role to one business
+             */
+            businessId?: string | null;
+            /**
+             * Format: uuid
+             * @description Scope the role to one store
+             */
+            storeId?: string | null;
+        };
+        RolesRequest: {
+            roles: components["schemas"]["RoleGrant"][];
+            reason: string;
+        };
+        User: {
+            /** Format: uuid */
+            id: string;
+            displayName: string;
+            phone?: string | null;
+            /** @enum {string} */
+            status: "active" | "disabled";
+            pinSet: boolean;
+            roles: components["schemas"]["RoleGrant"][];
+        };
+        SetPinRequest: {
+            pin: string;
+            reason: string;
+        };
+        VerifyPinRequest: {
+            pin: string;
+        };
+        VerifyPinResponse: {
+            valid: boolean;
+            roles: components["schemas"]["Role"][];
+        };
+        AuditEntry: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            occurredAt: string;
+            /** Format: uuid */
+            actorUserId?: string | null;
+            /** Format: uuid */
+            actorDeviceId?: string | null;
+            /**
+             * @example device.revoked
+             * @example credit_note.issued
+             * @example invoice.owner_approved
+             */
+            action: string;
+            entityType?: string | null;
+            /** Format: uuid */
+            entityId?: string | null;
+            reason?: string | null;
+            details: {
+                [key: string]: unknown;
+            };
+        };
+        ConsentPurpose: {
+            /** @example marketing_messages */
+            id: string;
+            description: string;
+            /** @description This purpose involves disclosure to third parties (needs the sharing log) */
+            thirdParty: boolean;
+        };
+        /** @description Every field is required on purpose; the server never defaults a consent. */
+        ConsentEventRequest: {
+            /**
+             * Format: uuid
+             * @description UUIDv7
+             */
+            operationId: string;
+            idempotencyKey: string;
+            /** @enum {string} */
+            subjectType: "party" | "user";
+            /** Format: uuid */
+            subjectId: string;
+            purpose: string;
+            /** @enum {string} */
+            action: "grant" | "withdraw";
+            /** @description The notice version the person saw */
+            policyVersion: string;
+            /** @enum {string} */
+            channel: "in_app" | "paper" | "verbal" | "whatsapp" | "sms";
+            /** Format: date-time */
+            occurredAt: string;
+        };
+        ConsentEvent: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            subjectType: "party" | "user";
+            /** Format: uuid */
+            subjectId: string;
+            purpose: string;
+            /** @enum {string} */
+            action: "grant" | "withdraw";
+            policyVersion: string;
+            channel: string;
+            /** Format: date-time */
+            occurredAt: string;
+        };
+        SubjectConsent: {
+            /** @enum {string} */
+            subjectType: "party" | "user";
+            /** Format: uuid */
+            subjectId: string;
+            /** @description Latest event per purpose. A purpose with no event, or whose latest is a withdrawal, is not consented. */
+            current: components["schemas"]["ConsentEvent"][];
+            history: components["schemas"]["ConsentEvent"][];
+        };
+        SharingLogRequest: {
+            /**
+             * Format: uuid
+             * @description UUIDv7
+             */
+            operationId: string;
+            idempotencyKey: string;
+            /** @enum {string} */
+            subjectType: "party" | "user";
+            /** Format: uuid */
+            subjectId: string;
+            purpose: string;
+            recipient: string;
+            dataCategories: string[];
+            /** Format: date-time */
+            sharedAt: string;
+        };
+        SharingLogEntry: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            subjectType: "party" | "user";
+            /** Format: uuid */
+            subjectId: string;
+            purpose: string;
+            recipient: string;
+            dataCategories: string[];
+            /** Format: uuid */
+            consentEventId: string;
+            /** Format: date-time */
+            sharedAt: string;
+        };
+        DataModeRequest: {
+            localOnly: boolean;
+            reason: string;
+        };
+        DataMode: {
+            localOnly: boolean;
+        };
+        TaxRule: {
+            /** Format: int64 */
+            id: number;
+            hsnPrefix: string;
+            description: string;
+            /** @description Basis points: 1800 = 18% */
+            rateBp: number;
+            cessBp: number;
+            /** Format: date */
+            effectiveFrom: string;
+            notificationRef?: string | null;
+        };
+        TaxRulePage: {
+            rules: components["schemas"]["TaxRule"][];
+            /** Format: int64 */
+            maxId: number;
+            more: boolean;
+        };
+        TaxThreshold: {
+            key: string;
+            /** Format: int64 */
+            valuePaise: number;
+            /** Format: date */
+            effectiveFrom: string;
+            notificationRef?: string | null;
+        };
+        /** @description Owner-PIN approval for a discount, void/credit note or backdated bill (PIN checked on the device). */
+        Approval: {
+            /** Format: uuid */
+            approverUserId: string;
+            reason: string;
+        };
+        /** @description entityType product. create needs name. Fields merge individually by HLC (newest write per field wins). void deactivates. */
+        ProductPayload: {
+            name?: string;
+            barcode?: string | null;
+            sku?: string | null;
+            hsn?: string | null;
+            unit?: string;
+            active?: boolean;
+        };
+        /** @description entityType price_version, create only (append-only, effective-dated). */
+        PriceVersionPayload: {
+            /** Format: uuid */
+            productId: string;
+            /** @enum {string} */
+            priceType: "mrp" | "retail" | "wholesale" | "purchase";
+            /** Format: int64 */
+            amountPaise: number;
+            /** Format: date-time */
+            effectiveFrom: string;
+        };
+        /**
+         * @description entityType party. create needs name. Field-level merge like product. A phone or GSTIN already held by
+         *     another party is flagged (party_identity_conflict), never rejected or auto-merged.
+         */
+        PartyPayload: {
+            name?: string;
+            /** @enum {string} */
+            partyType?: "customer" | "supplier" | "both";
+            phone?: string | null;
+            gstin?: string | null;
+            /** Format: int64 */
+            creditLimitPaise?: number | null;
+            active?: boolean;
+        };
+        /** @description entityType party_merge, create only. First merge wins; a conflicting later merge is recorded unapplied and flagged. */
+        PartyMergePayload: {
+            /** Format: uuid */
+            sourcePartyId: string;
+            /** Format: uuid */
+            targetPartyId: string;
+            reason?: string;
+        };
+        /**
+         * @description entityType stock_movement, create only. qtyMilli is a signed delta (sale = negative). Balance is the sum
+         *     of movements and may go negative: stock shows the shortfall and an `oversold` flag.
+         */
+        StockMovementPayload: {
+            /** Format: uuid */
+            productId: string;
+            /**
+             * Format: int64
+             * @description Signed, non-zero
+             */
+            qtyMilli: number;
+            /** @enum {string} */
+            reason: "opening" | "sale" | "purchase" | "sale_return" | "purchase_return" | "adjustment" | "transfer_in" | "transfer_out" | "damage";
+            refType?: string;
+            /** Format: uuid */
+            refId?: string;
+            /** Format: date-time */
+            occurredAt?: string;
+        };
+        InvoiceLine: {
+            /** Format: uuid */
+            productId: string;
+            /** Format: int64 */
+            qtyMilli: number;
+            /** Format: int64 */
+            unitPricePaise: number;
+            /**
+             * Format: int64
+             * @default 0
+             */
+            discountPaise: number;
+            hsn?: string | null;
+            /** @default 0 */
+            taxRateBp: number;
+            /**
+             * Format: int64
+             * @default 0
+             */
+            taxPaise: number;
+            /**
+             * Format: int64
+             * @description Line amount including tax, after line discount
+             */
+            lineTotalPaise: number;
+        };
+        /**
+         * @description entityType invoice, create only: finalised invoices are immutable (corrections are credit notes). Totals:
+         *     sum(lines.lineTotalPaise) = subtotalPaise + taxPaise and subtotalPaise + taxPaise - discountPaise +
+         *     roundOffPaise = totalPaise; a mismatch is flagged, not rejected. A discount or backdated bill needs `approval`.
+         */
+        InvoicePayload: {
+            /** @description Device-scoped number series, e.g. C1-2026-27 */
+            series: string;
+            /** Format: int64 */
+            number: number;
+            /** @enum {string} */
+            docType: "tax_invoice" | "bill_of_supply" | "retail_invoice";
+            /** Format: date */
+            invoiceDate: string;
+            /** Format: uuid */
+            partyId?: string | null;
+            /** Format: int64 */
+            subtotalPaise: number;
+            /**
+             * Format: int64
+             * @default 0
+             */
+            discountPaise: number;
+            /**
+             * Format: int64
+             * @default 0
+             */
+            taxPaise: number;
+            /**
+             * Format: int64
+             * @default 0
+             */
+            roundOffPaise: number;
+            /** Format: int64 */
+            totalPaise: number;
+            approval?: components["schemas"]["Approval"];
+            lines: components["schemas"]["InvoiceLine"][];
+        };
+        /** @description entityType credit_note, create only. Reason is mandatory; the owner's approval is expected. */
+        CreditNotePayload: {
+            series: string;
+            /** Format: int64 */
+            number: number;
+            /** Format: uuid */
+            invoiceId: string;
+            /** Format: uuid */
+            partyId?: string | null;
+            reason: string;
+            /** Format: int64 */
+            totalPaise: number;
+            lines?: {
+                [key: string]: unknown;
+            }[];
+            approval?: components["schemas"]["Approval"];
+        };
+        /** @description entityType purchase_receipt, create only. */
+        PurchaseReceiptPayload: {
+            series: string;
+            /** Format: int64 */
+            number: number;
+            /** Format: uuid */
+            supplierId?: string | null;
+            supplierRef?: string | null;
+            /** Format: date */
+            receiptDate: string;
+            /** Format: int64 */
+            totalPaise: number;
+            lines?: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** @description entityType order, create only; afterwards state changes only through order_transition. */
+        OrderPayload: {
+            /** Format: uuid */
+            partyId?: string | null;
+            /**
+             * @default draft
+             * @enum {string}
+             */
+            state: "draft" | "confirmed";
+        };
+        /**
+         * @description entityType order_transition, create only. Legal: draft->confirmed|cancelled, confirmed->packed|cancelled,
+         *     packed->dispatched|cancelled, dispatched->delivered, delivered->returned. An illegal one is recorded and
+         *     flagged (order_transition_conflict), never applied.
+         */
+        OrderTransitionPayload: {
+            /** Format: uuid */
+            orderId: string;
+            /** @enum {string} */
+            toState: "draft" | "confirmed" | "packed" | "dispatched" | "delivered" | "cancelled" | "returned";
+            reason?: string;
+        };
+        /** @description entityType payment, create only (append-only). */
+        PaymentPayload: {
+            /** Format: uuid */
+            partyId?: string | null;
+            /** Format: uuid */
+            invoiceId?: string | null;
+            /** @enum {string} */
+            direction: "in" | "out";
+            /** @enum {string} */
+            mode: "cash" | "upi" | "card" | "bank_transfer" | "cheque" | "other";
+            /** Format: int64 */
+            amountPaise: number;
+            reference?: string;
+            /** Format: date-time */
+            occurredAt?: string;
+        };
+        /**
+         * @description entityType khata_entry, create only (append-only). debit = party owes more; credit = party paid.
+         *     Balance = sum(debit) - sum(credit), a projection.
+         */
+        KhataEntryPayload: {
+            /** Format: uuid */
+            partyId: string;
+            /** @enum {string} */
+            direction: "debit" | "credit";
+            /** Format: int64 */
+            amountPaise: number;
+            refType?: string;
+            /** Format: uuid */
+            refId?: string;
+            note?: string;
+            /** Format: date-time */
+            occurredAt?: string;
         };
     };
-    responses: never;
-    parameters: never;
+    responses: {
+        /** @description Error. `code` is a stable machine-readable reason. */
+        Problem: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+    };
+    parameters: {
+        Id: string;
+        /** @description Acting staff member. Required (with X-Staff-Pin) for management calls. */
+        StaffId: string;
+        /** @description The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes. */
+        StaffPin: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -140,17 +1197,10 @@ export interface operations {
                     "application/json": components["schemas"]["UploadResponse"];
                 };
             };
-            /** @description Validation failed */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Not authenticated */
-            401: {
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description Device revoked, device mismatch, or the merchant is in local-only mode */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -167,6 +1217,817 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+        };
+    };
+    getSyncStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncStatus"];
+                };
+            };
+            401: components["responses"]["Problem"];
+        };
+    };
+    listRejectedOperations: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rejected operations, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RejectedOperation"][];
+                };
+            };
+            401: components["responses"]["Problem"];
+        };
+    };
+    listConflictFlags: {
+        parameters: {
+            query?: {
+                status?: "open" | "resolved" | "dismissed";
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Flags, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConflictFlag"][];
+                };
+            };
+            401: components["responses"]["Problem"];
+        };
+    };
+    resolveConflictFlag: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Acting staff member. Required (with X-Staff-Pin) for management calls. */
+                "X-Staff-Id"?: components["parameters"]["StaffId"];
+                /** @description The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes. */
+                "X-Staff-Pin"?: components["parameters"]["StaffPin"];
+            };
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveFlagRequest"];
+            };
+        };
+        responses: {
+            /** @description Resolved (or already closed) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getSyncCredentials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Credentials (token expires in minutes; the bucket key is the merchant id) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncCredentials"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    getMe: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Acting staff member. Required (with X-Staff-Pin) for management calls. */
+                "X-Staff-Id"?: components["parameters"]["StaffId"];
+                /** @description The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes. */
+                "X-Staff-Pin"?: components["parameters"]["StaffPin"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            401: components["responses"]["Problem"];
+        };
+    };
+    putBusiness: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Acting staff member. Required (with X-Staff-Pin) for management calls. */
+                "X-Staff-Id"?: components["parameters"]["StaffId"];
+                /** @description The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes. */
+                "X-Staff-Pin"?: components["parameters"]["StaffPin"];
+            };
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BusinessRequest"];
+            };
+        };
+        responses: {
+            /** @description Stored */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Business"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    putStore: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Acting staff member. Required (with X-Staff-Pin) for management calls. */
+                "X-Staff-Id"?: components["parameters"]["StaffId"];
+                /** @description The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes. */
+                "X-Staff-Pin"?: components["parameters"]["StaffPin"];
+            };
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StoreRequest"];
+            };
+        };
+        responses: {
+            /** @description Stored */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Store"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listDevices: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Acting staff member. Required (with X-Staff-Pin) for management calls. */
+                "X-Staff-Id"?: components["parameters"]["StaffId"];
+                /** @description The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes. */
+                "X-Staff-Pin"?: components["parameters"]["StaffPin"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Devices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Device"][];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    registerDevice: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Acting staff member. Required (with X-Staff-Pin) for management calls. */
+                "X-Staff-Id"?: components["parameters"]["StaffId"];
+                /** @description The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes. */
+                "X-Staff-Pin"?: components["parameters"]["StaffPin"];
+            };
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceRequest"];
+            };
+        };
+        responses: {
+            /** @description Already registered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRegistered"];
+                };
+            };
+            /** @description Registered */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRegistered"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    revokeDevice: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Acting staff member. Required (with X-Staff-Pin) for management calls. */
+                "X-Staff-Id"?: components["parameters"]["StaffId"];
+                /** @description The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes. */
+                "X-Staff-Pin"?: components["parameters"]["StaffPin"];
+            };
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Revoked (or already revoked) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    listUsers: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Acting staff member. Required (with X-Staff-Pin) for management calls. */
+                "X-Staff-Id"?: components["parameters"]["StaffId"];
+                /** @description The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes. */
+                "X-Staff-Pin"?: components["parameters"]["StaffPin"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Users */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"][];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    getUser: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Acting staff member. Required (with X-Staff-Pin) for management calls. */
+                "X-Staff-Id"?: components["parameters"]["StaffId"];
+                /** @description The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes. */
+                "X-Staff-Pin"?: components["parameters"]["StaffPin"];
+            };
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    putUser: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Acting staff member. Required (with X-Staff-Pin) for management calls. */
+                "X-Staff-Id"?: components["parameters"]["StaffId"];
+                /** @description The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes. */
+                "X-Staff-Pin"?: components["parameters"]["StaffPin"];
+            };
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserRequest"];
+            };
+        };
+        responses: {
+            /** @description Stored */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    putUserRoles: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Acting staff member. Required (with X-Staff-Pin) for management calls. */
+                "X-Staff-Id"?: components["parameters"]["StaffId"];
+                /** @description The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes. */
+                "X-Staff-Pin"?: components["parameters"]["StaffPin"];
+            };
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RolesRequest"];
+            };
+        };
+        responses: {
+            /** @description Stored */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    putUserPin: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Acting staff member. Required (with X-Staff-Pin) for management calls. */
+                "X-Staff-Id"?: components["parameters"]["StaffId"];
+                /** @description The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes. */
+                "X-Staff-Pin"?: components["parameters"]["StaffPin"];
+            };
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPinRequest"];
+            };
+        };
+        responses: {
+            /** @description PIN set */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    verifyUserPin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyPinRequest"];
+            };
+        };
+        responses: {
+            /** @description Verdict (`valid:false` for a wrong PIN) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifyPinResponse"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            423: components["responses"]["Problem"];
+        };
+    };
+    listAuditLog: {
+        parameters: {
+            query?: {
+                entityType?: string;
+                entityId?: string;
+                action?: string;
+                before?: string;
+                limit?: number;
+            };
+            header?: {
+                /** @description Acting staff member. Required (with X-Staff-Pin) for management calls. */
+                "X-Staff-Id"?: components["parameters"]["StaffId"];
+                /** @description The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes. */
+                "X-Staff-Pin"?: components["parameters"]["StaffPin"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Entries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEntry"][];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    listConsentPurposes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Purposes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentPurpose"][];
+                };
+            };
+            401: components["responses"]["Problem"];
+        };
+    };
+    recordConsentEvent: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Acting staff member. Required (with X-Staff-Pin) for management calls. */
+                "X-Staff-Id"?: components["parameters"]["StaffId"];
+                /** @description The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes. */
+                "X-Staff-Pin"?: components["parameters"]["StaffPin"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentEventRequest"];
+            };
+        };
+        responses: {
+            /** @description Stored (or the previously stored event on replay) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentEvent"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getSubjectConsent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                subjectType: "party" | "user";
+                subjectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Consent state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectConsent"];
+                };
+            };
+            401: components["responses"]["Problem"];
+        };
+    };
+    listSharingLog: {
+        parameters: {
+            query?: {
+                subjectType?: "party" | "user";
+                subjectId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disclosures, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharingLogEntry"][];
+                };
+            };
+            401: components["responses"]["Problem"];
+        };
+    };
+    logThirdPartySharing: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Acting staff member. Required (with X-Staff-Pin) for management calls. */
+                "X-Staff-Id"?: components["parameters"]["StaffId"];
+                /** @description The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes. */
+                "X-Staff-Pin"?: components["parameters"]["StaffPin"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SharingLogRequest"];
+            };
+        };
+        responses: {
+            /** @description Stored (or the previously stored entry on replay) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharingLogEntry"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getDataMode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mode */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataMode"];
+                };
+            };
+            401: components["responses"]["Problem"];
+        };
+    };
+    setDataMode: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Acting staff member. Required (with X-Staff-Pin) for management calls. */
+                "X-Staff-Id"?: components["parameters"]["StaffId"];
+                /** @description The acting staff member's PIN. Wrong PINs are counted; five misses lock the PIN for 15 minutes. */
+                "X-Staff-Pin"?: components["parameters"]["StaffPin"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DataModeRequest"];
+            };
+        };
+        responses: {
+            /** @description Mode */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataMode"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    listTaxRules: {
+        parameters: {
+            query?: {
+                sinceId?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of rules */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxRulePage"];
+                };
+            };
+            401: components["responses"]["Problem"];
+        };
+    };
+    resolveTaxRule: {
+        parameters: {
+            query: {
+                hsn: string;
+                asOf: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rule */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxRule"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    listTaxThresholds: {
+        parameters: {
+            query: {
+                asOf: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thresholds */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxThreshold"][];
+                };
+            };
+            401: components["responses"]["Problem"];
         };
     };
 }

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "size": "node scripts/check-bundle-size.mjs",
+    "smoke": "node scripts/smoke-powersync.mjs",
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -13,6 +15,9 @@
     "gen:api": "openapi-typescript ../../packages/contract/openapi.yaml -o src/api/schema.d.ts"
   },
   "dependencies": {
+    "@journeyapps/wa-sqlite": "^2.0.7",
+    "@powersync/react": "^2.0.2",
+    "@powersync/web": "^2.4.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

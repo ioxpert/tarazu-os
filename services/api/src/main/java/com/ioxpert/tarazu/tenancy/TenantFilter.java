@@ -29,12 +29,16 @@ class TenantFilter extends OncePerRequestFilter {
 	/** Largest request body accepted on /v1/** (a full 500-operation batch is well under 1 MB). */
 	static final long MAX_BODY_BYTES = 8L * 1024 * 1024;
 
+	private static boolean isPublic(String uri) {
+		return PublicPaths.ALL.contains(uri);
+	}
+
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
 		// fail closed: everything is authenticated except the health/info probes. (Matching "/v1/" on the raw URI
 		// let encoded or ;parameterised paths such as /%76%31/... or /v1;x=y/... slip past.)
 		String uri = request.getRequestURI();
-		return uri.equals("/actuator/health") || uri.startsWith("/actuator/health/") || uri.equals("/actuator/info");
+		return isPublic(uri) || uri.equals("/actuator/health") || uri.startsWith("/actuator/health/") || uri.equals("/actuator/info");
 	}
 
 	@Override

@@ -27,6 +27,8 @@ class SchemaGuardIT extends ApiIT {
 
 	/** Platform-owned reference data (docs/adr/0003): the only tables without tenant_id. */
 	private static final Set<String> GLOBAL_TABLES = Set.of("tax_rule", "tax_threshold");
+	/** Login lookup tables (docs/adr/0007): no tenant_id, no privileges for the API role, reachable only through SECURITY DEFINER functions. */
+	private static final Set<String> DIRECTORY_TABLES = Set.of("contact_directory", "otp_throttle");
 	private static final Set<String> NOT_OURS = Set.of("flyway_schema_history");
 
 	/** Evidence tables: rows are never updated or deleted, by anyone. */
@@ -43,7 +45,7 @@ class SchemaGuardIT extends ApiIT {
 		return jdbc.queryForList("""
 				SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
 				WHERE n.nspname = 'public' AND c.relkind = 'r' ORDER BY 1
-				""", String.class).stream().filter(t -> !NOT_OURS.contains(t) && !GLOBAL_TABLES.contains(t)).toList();
+				""", String.class).stream().filter(t -> !NOT_OURS.contains(t) && !GLOBAL_TABLES.contains(t) && !DIRECTORY_TABLES.contains(t)).toList();
 	}
 
 	@Test
@@ -74,6 +76,20 @@ class SchemaGuardIT extends ApiIT {
 			assertThat(jdbc.queryForObject("SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid = ('public.' || ?)::regclass", Boolean.class, table))
 					.as("%s: global tables still have FORCE RLS (read-only policy)", table).isTrue();
 		}
+	}
+
+	@Test
+	void theLoginDirectoryTablesGiveTheApiRoleNothingAndOnlyDefinerFunctionsTouchThem() {
+		for (String table : DIRECTORY_TABLES) {
+			assertThat(jdbc.queryForObject("SELECT has_table_privilege(current_user, ?, 'SELECT') OR has_table_privilege(current_user, ?, 'INSERT') "
+					+ "OR has_table_privilege(current_user, ?, 'UPDATE') OR has_table_privilege(current_user, ?, 'DELETE')", Boolean.class, table, table, table, table))
+					.as("%s: API role has no direct privilege", table).isFalse();
+		}
+		assertThat(jdbc.queryForList("""
+				SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+				WHERE n.nspname = 'public' AND p.proname IN ('contact_register', 'contact_release', 'contact_lookup', 'otp_throttle_hit')
+				  AND p.prosecdef AND p.proconfig::text LIKE '%search_path%'
+				""", String.class)).as("each is SECURITY DEFINER with a pinned search_path").hasSize(4);
 	}
 
 	@Test
@@ -134,6 +150,13 @@ class SchemaGuardIT extends ApiIT {
 	// ---------- real data, two tenants ----------
 
 	private void populateEverything(Seed s) throws Exception {
+		inTenant(s.tenant(), () -> {
+			UUID signup = UUID.randomUUID();
+			jdbc.update("INSERT INTO signup_request (tenant_id, id, owner_name, business_name, required_channels, expires_at) VALUES (?, ?, 'o', 'b', ARRAY['email'], now() + interval '1 hour')", s.tenant(), signup);
+			jdbc.update("INSERT INTO otp_challenge (tenant_id, id, purpose, channel, signup_id, code_hash, expires_at) VALUES (?, ?, 'signup', 'email', ?, 'x'::bytea, now() + interval '1 hour')", s.tenant(), UUID.randomUUID(), signup);
+			jdbc.update("INSERT INTO auth_session (tenant_id, id, user_id, token_hash, expires_at) VALUES (?, ?, ?, 'x'::bytea, now() + interval '1 day')", s.tenant(), UUID.randomUUID(), s.owner());
+			return null;
+		});
 		var d = new Ops(s);
 		UUID product = UUID.randomUUID();
 		UUID party = UUID.randomUUID();

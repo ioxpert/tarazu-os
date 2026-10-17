@@ -16,7 +16,14 @@ docker compose -f infra/docker-compose.yml up -d        # Postgres 16 + roles
 cd services/api && mvn spring-boot:run                  # API on :8080
 cd apps/web && npm ci && npm run dev                    # PWA on :5173, proxies /api to :8080
 ```
-### Try device sync locally (no OTP onboarding exists yet)
+### Sign up locally with OTP (no seed needed)
+```bash
+OTP_PEPPER=local-dev-pepper-change-me OTP_MODE=EITHER \
+  mvn -f services/api spring-boot:run -Dspring-boot.run.arguments="--tarazu.auth.otp.dev-log-codes=true"   # codes are logged, dev only
+# then open http://localhost:5173/#/onboarding, or POST /v1/auth/signup/start; OTP_MODE = EMAIL | PHONE | EITHER | BOTH
+```
+
+### Try device sync locally with the seeded dev merchant
 ```bash
 psql postgresql://tarazu_app:tarazu_app_dev@localhost:5432/tarazu -f infra/postgres/dev-seed.sql   # one dev merchant
 TARAZU_AUTH_DEV_HEADER_ENABLED=true mvn -f services/api spring-boot:run                          # dev header on, never in production

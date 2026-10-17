@@ -35,10 +35,15 @@ class FailClosedIT extends AbstractPostgresIT {
 	@Test
 	void everyV1EndpointIs401WithoutADeviceCredentialAndTheDevTenantHeaderIsIgnored() throws Exception {
 		List<String> checked = new ArrayList<>();
+		List<String> publicSeen = new ArrayList<>();
 		for (RequestMappingInfo info : mappings.getHandlerMethods().keySet()) {
 			for (String pattern : info.getPathPatternsCondition().getPatternValues()) {
 				if (!pattern.startsWith("/v1/")) {
 					continue;
+				}
+				if (com.ioxpert.tarazu.tenancy.PublicPaths.ALL.contains(pattern)) {
+					publicSeen.add(pattern);
+					continue; // the OTP handshake is deliberately public (ADR 0007); asserted separately below
 				}
 				String path = pattern.replaceAll("\\{[^}]+}", UUID.randomUUID().toString());
 				for (var method : info.getMethodsCondition().getMethods()) {
@@ -52,13 +57,25 @@ class FailClosedIT extends AbstractPostgresIT {
 				}
 			}
 		}
+		assertThat(publicSeen).as("every allow-listed public path is a real endpoint and nothing else is public")
+				.containsExactlyInAnyOrderElementsOf(com.ioxpert.tarazu.tenancy.PublicPaths.ALL);
 		assertThat(checked).as("the walk really found the API").hasSizeGreaterThan(25).contains("POST /v1/sync/upload");
+	}
+
+	@Test
+	void theOtpEndpointsAreNotConfiguredWithoutAPepperAndSaySoInsteadOfUsingADefaultSecret() throws Exception {
+		mvc.perform(request(HttpMethod.GET, "/v1/auth/otp/config")).andExpect(status().isOk()).andExpect(jsonPath("$.enabled").value(false));
+		mvc.perform(request(HttpMethod.POST, "/v1/auth/signup/start").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"ownerName\":\"A\",\"businessName\":\"B\",\"email\":\"a@b.in\"}"))
+				.andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("otp_not_configured"));
 	}
 
 	@Test
 	void encodedOrParameterisedPathsDoNotSlipPastTheGuard() throws Exception {
 		mvc.perform(request(HttpMethod.GET, "/%76%31/tax/rules")).andExpect(status().isUnauthorized());
 		mvc.perform(request(HttpMethod.GET, "/v1;a=b/consent/purposes")).andExpect(status().isUnauthorized());
+		mvc.perform(request(HttpMethod.GET, "/v1/auth/otp/config/")).andExpect(status().isUnauthorized());
+		mvc.perform(request(HttpMethod.GET, "/v1/auth/%6Ftp/config")).andExpect(status().isUnauthorized());
 		mvc.perform(request(HttpMethod.GET, "/actuator/health")).andExpect(status().isOk());
 	}
 

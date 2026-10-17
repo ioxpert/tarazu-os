@@ -53,7 +53,7 @@ class IdentityController {
 	record RevokeRequest(@NotBlank @Size(max = 500) String reason) {
 	}
 
-	record UserRequest(@NotBlank @Size(max = 200) String displayName, @Size(max = 20) String phone,
+	record UserRequest(@NotBlank @Size(max = 200) String displayName, @Size(max = 20) String phone, @Size(max = 254) String email,
 			@Pattern(regexp = "active|disabled") String status) {
 	}
 
@@ -132,7 +132,7 @@ class IdentityController {
 
 	@PutMapping("/users/{id}")
 	UserService.UserView putUser(@PathVariable UUID id, @Valid @RequestBody UserRequest body) {
-		return users.upsert(id, body.displayName(), body.phone(), body.status() == null ? "active" : body.status());
+		return users.upsert(id, body.displayName(), body.phone(), body.email(), body.status() == null ? "active" : body.status());
 	}
 
 	@GetMapping("/users")

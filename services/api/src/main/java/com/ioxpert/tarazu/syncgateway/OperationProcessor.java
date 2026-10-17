@@ -227,7 +227,7 @@ class OperationProcessor {
 				""").param("days", STUCK_DAYS).update();
 	}
 
-	private Operation toOperation(java.sql.ResultSet rs) throws java.sql.SQLException {
+	Operation toOperation(java.sql.ResultSet rs) throws java.sql.SQLException {
 		Hlc declared = Hlc.parse(rs.getString("hlc"));
 		java.time.Instant receivedAt = rs.getTimestamp("received_at").toInstant();
 		return new Operation(rs.getObject("operation_id", UUID.class), rs.getObject("tenant_id", UUID.class),

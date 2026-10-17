@@ -115,7 +115,8 @@ CREATE TABLE audit_log (
     reason          text,
     details         jsonb       NOT NULL DEFAULT '{}',
     operation_id    uuid,
-    FOREIGN KEY (tenant_id, actor_user_id)   REFERENCES app_user (tenant_id, id),
+    -- actor_user_id has no FK on purpose: for synced operations it is what the device claimed, and an unknown
+    -- claim must be recorded (and flagged) rather than fail the write. actor_device_id is authenticated.
     FOREIGN KEY (tenant_id, actor_device_id) REFERENCES device (tenant_id, id)
 );
 CREATE INDEX audit_log_entity_idx ON audit_log (tenant_id, entity_type, entity_id, occurred_at DESC);

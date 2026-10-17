@@ -40,8 +40,18 @@ public final class Ops {
 		return device;
 	}
 
+	private static final java.time.format.DateTimeFormatter MILLIS = java.time.format.DateTimeFormatter
+			.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(java.time.ZoneOffset.UTC);
+
 	public static String hlc(long millisAfterBase, int counter, String node) {
-		return "%s-%04x-%s".formatted(BASE.plusMillis(millisAfterBase), counter, node);
+		return "%s-%04x-%s".formatted(MILLIS.format(BASE.plusMillis(millisAfterBase)), counter, node);
+	}
+
+	/** The same op attributed to a different staff member (one device, many cashiers). */
+	public static Map<String, Object> by(Map<String, Object> op, UUID actor) {
+		Map<String, Object> copy = new LinkedHashMap<>(op);
+		copy.put("actorUserId", actor);
+		return copy;
 	}
 
 	public Map<String, Object> op(String entityType, UUID entityId, String opType, Map<String, Object> payload) {

@@ -4,8 +4,8 @@
 -- Uniqueness is per tenant (RLS makes other tenants' rows invisible, so it must be part of the key).
 ALTER TABLE operation_log DROP CONSTRAINT operation_log_pkey;
 ALTER TABLE operation_log ADD PRIMARY KEY (tenant_id, operation_id);
+-- Device-asserted actor. No FK: an unknown claim is stored as sent and flagged, never a reason to lose the op.
 ALTER TABLE operation_log ADD COLUMN actor_user_id uuid;
-ALTER TABLE operation_log ADD FOREIGN KEY (tenant_id, actor_user_id) REFERENCES app_user (tenant_id, id);
 CREATE INDEX operation_log_entity_idx ON operation_log (tenant_id, entity_type, entity_id);
 
 -- Mutable bookkeeping about each op. The op itself (operation_log) never changes.

@@ -150,9 +150,9 @@ describe('sign-up', () => {
     const resend = await screen.findAllByRole('button', { name: /send again in \d+s/i })
     expect(resend[0]).toBeDisabled()
     await act(async () => {
-      vi.advanceTimersByTime(61_000)
+      await vi.advanceTimersByTimeAsync(61_000)
     })
-    const ready = await screen.findAllByRole('button', { name: /send a new code/i })
+    const ready = await screen.findAllByRole('button', { name: /send a new code/i }, { timeout: 4000 })
     fireEvent.click(ready[0])
     await waitFor(() => expect(api.calls.some((c) => c.path.startsWith('POST /v1/auth/signup/resend'))).toBe(true))
     expect(await screen.findAllByRole('button', { name: /send again in \d+s/i })).toHaveLength(1) // only the resent contact restarts its countdown

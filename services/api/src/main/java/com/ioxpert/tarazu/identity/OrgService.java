@@ -59,6 +59,14 @@ class OrgService {
 		return new BusinessView(id, name, gstMode, gstin, stateCode);
 	}
 
+	@Transactional(readOnly = true)
+	java.util.List<StoreView> listStores() {
+		tenantSession.bindCurrentTenant();
+		access.require(Permission.DEVICE_MANAGE);
+		return jdbc.sql("SELECT id, business_id, name FROM store ORDER BY created_at")
+				.query((rs, n) -> new StoreView(rs.getObject("id", UUID.class), rs.getObject("business_id", UUID.class), rs.getString("name"))).list();
+	}
+
 	@Transactional
 	StoreView upsertStore(UUID id, UUID businessId, String name) {
 		tenantSession.bindCurrentTenant();

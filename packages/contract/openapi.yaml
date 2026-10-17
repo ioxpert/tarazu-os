@@ -417,6 +417,24 @@ paths:
           $ref: '#/components/responses/Problem'
         '409':
           $ref: '#/components/responses/Problem'
+  /v1/identity/stores:
+    get:
+      operationId: listStores
+      summary: Stores of this tenant (needed to register a device after signing in)
+      tags: [identity]
+      responses:
+        '200':
+          description: Stores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Store'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
   /v1/identity/stores/{id}:
     put:
       operationId: putStore

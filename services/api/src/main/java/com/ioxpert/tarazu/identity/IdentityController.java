@@ -107,6 +107,11 @@ class IdentityController {
 		return org.upsertBusiness(id, body.name(), body.gstMode(), body.gstin(), body.stateCode());
 	}
 
+	@GetMapping("/stores")
+	List<OrgService.StoreView> listStores() {
+		return org.listStores();
+	}
+
 	@PutMapping("/stores/{id}")
 	OrgService.StoreView putStore(@PathVariable UUID id, @Valid @RequestBody StoreRequest body) {
 		return org.upsertStore(id, body.businessId(), body.name());

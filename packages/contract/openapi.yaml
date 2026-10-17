@@ -308,6 +308,60 @@ paths:
                   $ref: '#/components/schemas/RejectedOperation'
         '401':
           $ref: '#/components/responses/Problem'
+  /v1/sync/rejections:
+    get:
+      operationId: listRejectionsForRecovery
+      summary: Rejected operations with their raw payloads, for owner or manager recovery (ADR 0013)
+      tags: [sync]
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200':
+          description: Rejected operations, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RejectionForRecovery'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+  /v1/sync/rejections/{operationId}/reapply:
+    post:
+      operationId: reapplyRejectedOperation
+      summary: Re-apply a rejected operation as is, or with an owner-only corrective patch
+      description: |
+        The original stays in the immutable operation log; the patch, reason and actor go to the audit log. If the
+        operation is still invalid the response is its (rejected) result and nothing changes. Deferred children of a
+        recovered entity are applied.
+      tags: [sync]
+      parameters:
+        - { name: operationId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReapplyRequest'
+      responses:
+        '200':
+          description: The operation's new result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationResult'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
   /v1/sync/flags:
     get:
       operationId: listConflictFlags
@@ -1216,6 +1270,28 @@ components:
             rejected: invalid_payload, unknown_entity_type, unsupported_schema_version, immutable_document, append_only,
             duplicate_invoice_number, integrity_violation, internal_error (server bug; kept raw for re-application). flagged: comma-separated flag kinds. deferred: missing_dependency.
         message: { type: [string, 'null'] }
+    RejectionForRecovery:
+      type: object
+      required: [operationId, deviceId, entityType, entityId, opType, code, receivedAt, payload]
+      properties:
+        operationId: { type: string, format: uuid }
+        deviceId: { type: string, format: uuid }
+        entityType: { type: string }
+        entityId: { type: string, format: uuid }
+        opType: { type: string }
+        code: { type: string }
+        detail: { type: [string, 'null'] }
+        receivedAt: { type: string, format: date-time }
+        payload: { type: object, additionalProperties: true }
+    ReapplyRequest:
+      type: object
+      required: [reason]
+      properties:
+        payloadPatch:
+          type: [object, 'null']
+          additionalProperties: true
+          description: RFC 7386 merge patch over the original payload. Owner only.
+        reason: { type: string, minLength: 1, maxLength: 500 }
     UploadResponse:
       type: object
       required: [accepted, duplicates, rejected, deferred, flagged, results]

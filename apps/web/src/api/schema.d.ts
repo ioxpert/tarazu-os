@@ -218,6 +218,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/sync/rejections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rejected operations with their raw payloads, for owner or manager recovery (ADR 0013) */
+        get: operations["listRejectionsForRecovery"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sync/rejections/{operationId}/reapply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-apply a rejected operation as is, or with an owner-only corrective patch
+         * @description The original stays in the immutable operation log; the patch, reason and actor go to the audit log. If the
+         *     operation is still invalid the response is its (rejected) result and nothing changes. Deferred children of a
+         *     recovered entity are applied.
+         */
+        post: operations["reapplyRejectedOperation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/sync/flags": {
         parameters: {
             query?: never;
@@ -852,6 +891,30 @@ export interface components {
              */
             code?: string | null;
             message?: string | null;
+        };
+        RejectionForRecovery: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: uuid */
+            deviceId: string;
+            entityType: string;
+            /** Format: uuid */
+            entityId: string;
+            opType: string;
+            code: string;
+            detail?: string | null;
+            /** Format: date-time */
+            receivedAt: string;
+            payload: {
+                [key: string]: unknown;
+            };
+        };
+        ReapplyRequest: {
+            /** @description RFC 7386 merge patch over the original payload. Owner only. */
+            payloadPatch?: {
+                [key: string]: unknown;
+            } | null;
+            reason: string;
         };
         UploadResponse: {
             /** @description Newly stored this call (any outcome) */
@@ -1849,6 +1912,61 @@ export interface operations {
                 };
             };
             401: components["responses"]["Problem"];
+        };
+    };
+    listRejectionsForRecovery: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rejected operations, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RejectionForRecovery"][];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    reapplyRejectedOperation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReapplyRequest"];
+            };
+        };
+        responses: {
+            /** @description The operation's new result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationResult"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
         };
     };
     listConflictFlags: {

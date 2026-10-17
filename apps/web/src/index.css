@@ -1,0 +1,8 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { margin: 0; }
+.shell { max-width: 36rem; margin: 0 auto; padding: 2rem 1rem; }
+h1 { margin: 0 0 .25rem; }
+.tagline { margin: 0 0 1.5rem; opacity: .75; }
+.status { list-style: none; padding: 0; display: grid; gap: .5rem; }
+.status li { padding: .75rem 1rem; border-radius: .5rem; border: 1px solid #8884; border-left: 6px solid #d97706; }
+.status li[data-ok='true'] { border-left-color: #0f766e; }

@@ -1,0 +1,6 @@
+extends:
+  - recommended
+rules:
+  info-license: off              # internal API
+  no-server-example.com: off     # localhost dev server
+  operation-4xx-response: off    # health endpoint has no client-error case

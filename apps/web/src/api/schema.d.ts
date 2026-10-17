@@ -455,7 +455,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Set a staff member's PIN (4-8 digits) */
+        /** Set a staff member's PIN (4-8 digits; an owner's PIN needs at least 6, else 422 owner_pin_too_short) */
         put: operations["putUserPin"];
         post?: never;
         delete?: never;
@@ -2314,6 +2314,7 @@ export interface operations {
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     verifyUserPin: {

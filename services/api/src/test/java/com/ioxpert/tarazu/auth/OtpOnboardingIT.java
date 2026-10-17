@@ -23,6 +23,9 @@ import tools.jackson.databind.JsonNode;
 class OtpOnboardingIT extends ApiIT {
 
 	private static final AtomicInteger SEQ = new AtomicInteger(1000);
+	/** The login directory is global and survives runs on a reused database, so contacts must be unique per run. */
+	private static final String RUN = UUID.randomUUID().toString().substring(0, 8);
+	private static final int PHONE_BASE = new java.util.Random().nextInt(90_000_000) + 10_000_000;
 
 	@Autowired OtpSettings settings;
 
@@ -35,11 +38,11 @@ class OtpOnboardingIT extends ApiIT {
 	}
 
 	private String email() {
-		return "owner" + SEQ.incrementAndGet() + "@example.in";
+		return "owner" + SEQ.incrementAndGet() + "-" + RUN + "@example.in";
 	}
 
 	private String phone() {
-		return "+9198" + String.format("%08d", SEQ.incrementAndGet());
+		return "+9198" + String.format("%08d", PHONE_BASE + SEQ.incrementAndGet());
 	}
 
 	private ResultActions postJson(String path, Map<String, ?> body) throws Exception {

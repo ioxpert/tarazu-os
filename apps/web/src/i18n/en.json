@@ -111,6 +111,8 @@
     "ownerPin": "Owner PIN",
     "approve": "Approve",
     "wrongPin": "Wrong PIN. Try again.",
+    "locked": "Too many wrong PINs. Owner approval is locked on this device for 15 minutes.",
+    "stale": "This device has not refreshed the owner PIN for over 30 days. Connect to the internet once, then try again.",
     "noApprovers": "The owner PIN is not on this device yet. Connect to the internet once, or ask the owner to approve on another device.",
     "reasonNeeded": "Please write a reason.",
     "discountTitle": "Approve discount",

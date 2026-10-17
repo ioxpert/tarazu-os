@@ -58,6 +58,11 @@ public abstract class ApiIT extends AbstractPostgresIT {
 		return id;
 	}
 
+	/** Public hook for helpers in other packages. */
+	public UUID addDeviceForTest(Seed seed) {
+		return addDevice(seed);
+	}
+
 	protected UUID addUser(Seed seed, String role) {
 		UUID id = UUID.randomUUID();
 		inTenant(seed.tenant(), () -> {

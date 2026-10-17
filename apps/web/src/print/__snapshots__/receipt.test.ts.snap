@@ -1,0 +1,451 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`receipt layout snapshots > Hindi names, en+hi @58mm 1`] = `
+"   श्री गणेश किराना
+           गांधी रोड, पुणे
+      Ph / फ़ोन: 9822012345
+       GSTIN / जीएसटीआईएन:
+        27ABCDE1234F1Z5
+--------------------------------
+          Tax Invoice
+             कर चालान
+--------------------------------
+Bill no / बिल नं
+             A1B2C3D4/2026-27/17
+Date / दिनांक      17-10-2026 14:35
+Customer / ग्राहक          रमेश कुमार
+Cashier / कैशियर              Asha
+--------------------------------
+Atta 5kg
+आशीर्वाद आटा 5 किलो
+  5kg x 45.00             225.00
+Parle-G
+पारले-जी बिस्कुट
+  3 x 10.00                30.00
+Lux Soap
+  1 x 49.50                49.50
+--------------------------------
+Taxable value / कर योग्य मूल्य
+                          281.66
+CGST / सीजीएसटी               11.41
+SGST / एसजीएसटी              11.43
+Round off / पूर्णांक           +0.50
+================================
+TOTAL     305.00
+================================
+GST: 5% 10.71, 18% 12.13
+--------------------------------
+Paid / भुगतान Cash / नकद    500.00
+Change / वापसी              195.00
+           Thank you
+             धन्यवाद
+
+
+
+"
+`;
+
+exports[`receipt layout snapshots > Hindi names, hi @80mm 1`] = `
+"       श्री गणेश किराना
+                   गांधी रोड, पुणे
+                 फ़ोन: 9822012345
+           जीएसटीआईएन: 27ABCDE1234F1Z5
+------------------------------------------------
+                     कर चालान
+------------------------------------------------
+बिल नं                         A1B2C3D4/2026-27/17
+दिनांक                             17-10-2026 14:35
+ग्राहक                                     रमेश कुमार
+कैशियर                                        Asha
+------------------------------------------------
+वस्तु                     मात्रा       दर          राशि
+------------------------------------------------
+आशीर्वाद आटा 5 किलो           5kg    45.00      225.00
+पारले-जी बिस्कुट                3    10.00       30.00
+Lux Soap                  1    49.50       49.50
+------------------------------------------------
+कर योग्य मूल्य                                281.66
+सीजीएसटी                                      11.41
+एसजीएसटी                                     11.43
+पूर्णांक                                       +0.50
+================================================
+कुल                305.00
+================================================
+जीएसटी%          कर योग्य        सीजीएसटी        एसजीएसटी
+5%             214.29         5.35          5.36
+18%             67.37         6.06          6.07
+------------------------------------------------
+भुगतान नकद                                  500.00
+वापसी                                       195.00
+                     धन्यवाद
+
+
+
+"
+`;
+
+exports[`receipt layout snapshots > composition bill of supply @58mm 1`] = `
+"      Sharma General Store
+Shop 4, Gandhi Road, Pune 411001
+         Ph: 9822012345
+     GSTIN: 27ABCDE1234F1Z5
+--------------------------------
+         Bill of Supply
+Composition taxable person, not
+   eligible to collect tax on
+            supplies
+--------------------------------
+Bill no      A1B2C3D4/2026-27/19
+Date            17-10-2026 16:00
+--------------------------------
+Rice 1kg
+  2.5kg x 60.00           150.00
+Dal 500g
+  1pkt x 90.00             90.00
+================================
+TOTAL     240.00
+================================
+Paid Cash                 250.00
+Change                     10.00
+           Thank you
+
+
+
+"
+`;
+
+exports[`receipt layout snapshots > composition bill of supply @80mm 1`] = `
+"  Sharma General Store
+        Shop 4, Gandhi Road, Pune 411001
+                 Ph: 9822012345
+             GSTIN: 27ABCDE1234F1Z5
+------------------------------------------------
+                 Bill of Supply
+  Composition taxable person, not eligible to
+            collect tax on supplies
+------------------------------------------------
+Bill no                      A1B2C3D4/2026-27/19
+Date                            17-10-2026 16:00
+------------------------------------------------
+Item                    Qty     Rate      Amount
+------------------------------------------------
+Rice 1kg              2.5kg    60.00      150.00
+Dal 500g               1pkt    90.00       90.00
+================================================
+TOTAL             240.00
+================================================
+Paid Cash                                 250.00
+Change                                     10.00
+                   Thank you
+
+
+
+"
+`;
+
+exports[`receipt layout snapshots > credit note @58mm 1`] = `
+"      Sharma General Store
+Shop 4, Gandhi Road, Pune 411001
+         Ph: 9822012345
+     GSTIN: 27ABCDE1234F1Z5
+--------------------------------
+          Credit Note
+--------------------------------
+Bill no    A1B2C3D4/2026-27/CN-3
+Date            18-10-2026 17:30
+Against bill A1B2C3D4/2026-27/17
+Cashier                     Asha
+--------------------------------
+Parle-G
+  1 x 10.00                10.00
+--------------------------------
+Taxable value               8.47
+CGST                        0.76
+SGST                        0.77
+================================
+TOTAL      10.00
+================================
+GST: 18% 1.53
+--------------------------------
+Refund Cash                10.00
+           Thank you
+
+
+
+"
+`;
+
+exports[`receipt layout snapshots > credit note @80mm 1`] = `
+"  Sharma General Store
+        Shop 4, Gandhi Road, Pune 411001
+                 Ph: 9822012345
+             GSTIN: 27ABCDE1234F1Z5
+------------------------------------------------
+                  Credit Note
+------------------------------------------------
+Bill no                    A1B2C3D4/2026-27/CN-3
+Date                            18-10-2026 17:30
+Against bill                 A1B2C3D4/2026-27/17
+Cashier                                     Asha
+------------------------------------------------
+Item                    Qty     Rate      Amount
+------------------------------------------------
+Parle-G                   1    10.00       10.00
+------------------------------------------------
+Taxable value                               8.47
+CGST                                        0.76
+SGST                                        0.77
+================================================
+TOTAL              10.00
+================================================
+GST%          Taxable         CGST          SGST
+18%              8.47         0.76          0.77
+------------------------------------------------
+Refund Cash                                10.00
+                   Thank you
+
+
+
+"
+`;
+
+exports[`receipt layout snapshots > discounted split-tender with credit @58mm 1`] = `
+"      Sharma General Store
+Shop 4, Gandhi Road, Pune 411001
+         Ph: 9822012345
+     GSTIN: 27ABCDE1234F1Z5
+--------------------------------
+          Tax Invoice
+--------------------------------
+Bill no      A1B2C3D4/2026-27/18
+Date            17-10-2026 14:35
+Customer            Ramesh Kumar
+Cashier                     Asha
+--------------------------------
+Sugar
+  2kg x 44.00              88.00
+Sunflower Oil 1L
+  1L x 150.00             140.00
+  Discount                -10.00
+--------------------------------
+Taxable value             217.14
+CGST                        5.43
+SGST                        5.43
+================================
+TOTAL     228.00
+================================
+You saved                  10.00
+GST: 5% 10.86
+--------------------------------
+Paid UPI Ref:UTR123       100.00
+Paid Cash                  50.00
+================================
+Customer owes              78.00
+================================
+[QR 25x25]
+          Scan to pay
+             78.00
+           Thank you
+
+
+
+"
+`;
+
+exports[`receipt layout snapshots > discounted split-tender with credit @80mm 1`] = `
+"  Sharma General Store
+        Shop 4, Gandhi Road, Pune 411001
+                 Ph: 9822012345
+             GSTIN: 27ABCDE1234F1Z5
+------------------------------------------------
+                  Tax Invoice
+------------------------------------------------
+Bill no                      A1B2C3D4/2026-27/18
+Date                            17-10-2026 14:35
+Customer                            Ramesh Kumar
+Cashier                                     Asha
+------------------------------------------------
+Item                    Qty     Rate      Amount
+------------------------------------------------
+Sugar                   2kg    44.00       88.00
+Sunflower Oil 1L         1L   150.00      140.00
+  Discount                                -10.00
+------------------------------------------------
+Taxable value                             217.14
+CGST                                        5.43
+SGST                                        5.43
+================================================
+TOTAL             228.00
+================================================
+You saved                                  10.00
+GST%          Taxable         CGST          SGST
+5%             217.14         5.43          5.43
+------------------------------------------------
+Paid UPI Ref:UTR123                       100.00
+Paid Cash                                  50.00
+================================================
+Customer owes                              78.00
+================================================
+[QR 25x25]
+                  Scan to pay
+                     78.00
+                   Thank you
+
+
+
+"
+`;
+
+exports[`receipt layout snapshots > long item names @58mm 1`] = `
+"      Sharma General Store
+Shop 4, Gandhi Road, Pune 411001
+         Ph: 9822012345
+     GSTIN: 27ABCDE1234F1Z5
+--------------------------------
+          Tax Invoice
+--------------------------------
+Bill no      A1B2C3D4/2026-27/17
+Date            17-10-2026 14:35
+Cashier                     Asha
+--------------------------------
+Britannia Good Day Cashew Almond
+Butter Cookies Family Pack 600g
+Jumbo
+  2 x 120.50              241.00
+Supercalifragilisticexpialidocio
+us-Supercalifragilisticexpialido
+cious
+  1.5kg x 1,000.00      1,500.00
+--------------------------------
+Taxable value           1,650.00
+CGST                       11.41
+SGST                       11.43
+================================
+TOTAL   1,741.00
+================================
+GST: 5% 10.71, 18% 12.13
+--------------------------------
+Paid Card               1,741.00
+           Thank you
+
+
+
+"
+`;
+
+exports[`receipt layout snapshots > long item names @80mm 1`] = `
+"  Sharma General Store
+        Shop 4, Gandhi Road, Pune 411001
+                 Ph: 9822012345
+             GSTIN: 27ABCDE1234F1Z5
+------------------------------------------------
+                  Tax Invoice
+------------------------------------------------
+Bill no                      A1B2C3D4/2026-27/17
+Date                            17-10-2026 14:35
+Cashier                                     Asha
+------------------------------------------------
+Item                    Qty     Rate      Amount
+------------------------------------------------
+Britannia Good Day        2   120.50      241.00
+Cashew Almond
+Butter Cookies
+Family Pack 600g
+Jumbo
+Supercalifragilisti   1.5kg 1,000.00    1,500.00
+cexpialidocious-Sup
+ercalifragilisticex
+pialidocious
+------------------------------------------------
+Taxable value                           1,650.00
+CGST                                       11.41
+SGST                                       11.43
+================================================
+TOTAL           1,741.00
+================================================
+GST%          Taxable         CGST          SGST
+5%             214.29         5.35          5.36
+18%             67.37         6.06          6.07
+------------------------------------------------
+Paid Card                               1,741.00
+                   Thank you
+
+
+
+"
+`;
+
+exports[`receipt layout snapshots > plain sale @58mm 1`] = `
+"      Sharma General Store
+Shop 4, Gandhi Road, Pune 411001
+         Ph: 9822012345
+     GSTIN: 27ABCDE1234F1Z5
+--------------------------------
+          Tax Invoice
+--------------------------------
+Bill no      A1B2C3D4/2026-27/17
+Date            17-10-2026 14:35
+Cashier                     Asha
+--------------------------------
+Atta 5kg
+  5kg x 45.00             225.00
+Parle-G
+  3 x 10.00                30.00
+Lux Soap
+  1 x 49.50                49.50
+--------------------------------
+Taxable value             281.66
+CGST                       11.41
+SGST                       11.43
+Round off                  +0.50
+================================
+TOTAL     305.00
+================================
+GST: 5% 10.71, 18% 12.13
+--------------------------------
+Paid Cash                 500.00
+Change                    195.00
+           Thank you
+
+
+
+"
+`;
+
+exports[`receipt layout snapshots > plain sale @80mm 1`] = `
+"  Sharma General Store
+        Shop 4, Gandhi Road, Pune 411001
+                 Ph: 9822012345
+             GSTIN: 27ABCDE1234F1Z5
+------------------------------------------------
+                  Tax Invoice
+------------------------------------------------
+Bill no                      A1B2C3D4/2026-27/17
+Date                            17-10-2026 14:35
+Cashier                                     Asha
+------------------------------------------------
+Item                    Qty     Rate      Amount
+------------------------------------------------
+Atta 5kg                5kg    45.00      225.00
+Parle-G                   3    10.00       30.00
+Lux Soap                  1    49.50       49.50
+------------------------------------------------
+Taxable value                             281.66
+CGST                                       11.41
+SGST                                       11.43
+Round off                                  +0.50
+================================================
+TOTAL             305.00
+================================================
+GST%          Taxable         CGST          SGST
+5%             214.29         5.35          5.36
+18%             67.37         6.06          6.07
+------------------------------------------------
+Paid Cash                                 500.00
+Change                                    195.00
+                   Thank you
+
+
+
+"
+`;

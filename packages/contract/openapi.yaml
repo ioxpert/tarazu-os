@@ -32,6 +32,8 @@ tags:
     description: Purpose-specific consent ledger, third-party sharing log and local-only mode.
   - name: tax
     description: Server-controlled, effective-dated GST rule tables.
+  - name: catalogue
+    description: Platform product master (global reference data).
   - name: health
     description: Liveness.
 paths:
@@ -713,6 +715,47 @@ paths:
           $ref: '#/components/responses/Problem'
         '423':
           $ref: '#/components/responses/Problem'
+  /v1/identity/approvers:
+    get:
+      operationId: listApprovers
+      summary: Owner PIN verifiers so a device can check an approval offline
+      description: |
+        Active owners with a PIN set, with the PBKDF2-HMAC-SHA256 parameters (docs/adr/0005). The device caches
+        these and verifies an owner PIN locally when a cashier discount above policy, a return or a back-dated
+        bill needs approval and the network is down. Device credential only; never returned to a browser session.
+      tags: [identity]
+      responses:
+        '200':
+          description: Approvers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Approver'
+        '401':
+          $ref: '#/components/responses/Problem'
+  /v1/catalogue/master/{barcode}:
+    get:
+      operationId: getMasterProduct
+      summary: Look a barcode up in the platform product master
+      description: |
+        Global reference data (docs/adr/0006), the same rows for every merchant. Used to pre-fill the add-item
+        form for a barcode the device has never seen. 404 when the master has no such barcode.
+      tags: [catalogue]
+      parameters:
+        - { name: barcode, in: path, required: true, schema: { type: string, pattern: '^[0-9]{6,14}$' } }
+      responses:
+        '200':
+          description: The master record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MasterProduct'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
   /v1/identity/audit-log:
     get:
       operationId: listAuditLog
@@ -1119,7 +1162,7 @@ components:
           type: string
           minLength: 1
           maxLength: 64
-          examples: [product, price_version, party, party_merge, stock_movement, invoice, credit_note, purchase_receipt, order, order_transition, payment, khata_entry]
+          examples: [product, price_version, party, party_merge, stock_movement, invoice, credit_note, purchase_receipt, order, order_transition, payment, khata_entry, shift, shift_close]
         entityId: { type: string, format: uuid }
         opType: { type: string, enum: [create, update, void] }
         schemaVersion: { type: integer, minimum: 1 }
@@ -1138,6 +1181,8 @@ components:
             - $ref: '#/components/schemas/OrderTransitionPayload'
             - $ref: '#/components/schemas/PaymentPayload'
             - $ref: '#/components/schemas/KhataEntryPayload'
+            - $ref: '#/components/schemas/ShiftPayload'
+            - $ref: '#/components/schemas/ShiftClosePayload'
     UploadRequest:
       type: object
       required: [operations]
@@ -1242,6 +1287,12 @@ components:
         roles:
           type: array
           items: { $ref: '#/components/schemas/Role' }
+        storeName: { type: [string, 'null'] }
+        business:
+          description: The device's business (null for a tenant-level credential with no store).
+          oneOf:
+            - $ref: '#/components/schemas/Business'
+            - type: 'null'
     Role:
       type: string
       enum: [owner, manager, cashier, purchaser, accountant, sales_rep, delivery_agent]
@@ -1257,6 +1308,7 @@ components:
         gstMode: { $ref: '#/components/schemas/GstMode' }
         gstin: { type: [string, 'null'], pattern: '^[0-9A-Z]{15}$' }
         stateCode: { type: [string, 'null'], pattern: '^[0-9]{2}$' }
+        upiVpa: { type: [string, 'null'], pattern: '^[A-Za-z0-9._-]{2,256}@[A-Za-z]{2,64}$', description: 'Merchant UPI address printed on receipts and encoded in payment QR codes' }
     Business:
       type: object
       required: [id, name, gstMode]
@@ -1266,6 +1318,7 @@ components:
         gstMode: { $ref: '#/components/schemas/GstMode' }
         gstin: { type: [string, 'null'] }
         stateCode: { type: [string, 'null'] }
+        upiVpa: { type: [string, 'null'] }
     StoreRequest:
       type: object
       required: [businessId, name]
@@ -1500,15 +1553,51 @@ components:
       properties:
         approverUserId: { type: string, format: uuid }
         reason: { type: string, minLength: 1 }
+    UomSpec:
+      type: object
+      description: |
+        Unit-of-measure chain for a product. Quantities and prices on every document are per `base` unit
+        (qtyMilli 1000 = one base unit). `units` lists the other units the item is sold or counted in;
+        `qtyMilli` is how many milli-base-units one of that unit holds. Example: piece base, packet 12 pieces,
+        case 24 packets = [{unit: packet, qtyMilli: 12000}, {unit: case, qtyMilli: 288000}]. Loose items use a
+        weighed base (kg, litre) with sub-units such as g = 1 and ml = 1.
+      required: [base, units]
+      properties:
+        base: { $ref: '#/components/schemas/UomUnit' }
+        units:
+          type: array
+          maxItems: 8
+          items:
+            type: object
+            required: [unit, qtyMilli]
+            properties:
+              unit: { $ref: '#/components/schemas/UomUnit' }
+              qtyMilli: { type: integer, format: int64, minimum: 1 }
+    UomUnit:
+      type: string
+      enum: [piece, packet, strip, bottle, dozen, kg, g, litre, ml, bag, box, case, carton, bundle]
     ProductPayload:
       type: object
-      description: entityType product. create needs name. Fields merge individually by HLC (newest write per field wins). void deactivates.
+      description: |
+        entityType product. create needs name. Fields merge individually by HLC (newest write per field wins).
+        void deactivates. `unit` is the default selling unit; `uom` the full chain. `taxRateBp` is the merchant's
+        own rate, used only when no server tax rule resolves for `hsn` on the bill date. A starter-pack item
+        carries `packSku` so a duplicate seed is detectable.
       properties:
         name: { type: string }
+        localName: { type: [string, 'null'], description: 'Name in the merchant language, e.g. Devanagari' }
+        brand: { type: [string, 'null'] }
+        category: { type: [string, 'null'] }
         barcode: { type: [string, 'null'] }
         sku: { type: [string, 'null'] }
+        packSku: { type: [string, 'null'] }
         hsn: { type: [string, 'null'] }
-        unit: { type: string }
+        unit: { $ref: '#/components/schemas/UomUnit' }
+        uom: { oneOf: [{ $ref: '#/components/schemas/UomSpec' }, { type: 'null' }] }
+        taxInclusive: { type: boolean, description: 'Prices are tax-inclusive (MRP style). Default true.' }
+        taxRateBp: { type: [integer, 'null'], minimum: 0, maximum: 10000 }
+        loose: { type: boolean, description: 'Sold by weight or volume' }
+        pinned: { type: boolean, description: 'Shown on the billing screen without searching' }
         active: { type: boolean }
     PriceVersionPayload:
       type: object
@@ -1516,9 +1605,54 @@ components:
       required: [productId, priceType, amountPaise, effectiveFrom]
       properties:
         productId: { type: string, format: uuid }
-        priceType: { type: string, enum: [mrp, retail, wholesale, purchase] }
+        priceType: { type: string, enum: [mrp, retail, wholesale, purchase, customer], description: 'customer = a negotiated rate for one party (partyId required). Price is per base unit.' }
+        partyId: { type: [string, 'null'], format: uuid, description: 'Required for priceType customer, null otherwise' }
         amountPaise: { type: integer, format: int64, minimum: 0 }
         effectiveFrom: { type: string, format: date-time }
+    ShiftPayload:
+      type: object
+      description: entityType shift, create only. Opens a cash shift on this device with the counted float.
+      required: [openingCashPaise]
+      properties:
+        openingCashPaise: { type: integer, format: int64, minimum: 0 }
+        openedAt: { type: string, format: date-time }
+        note: { type: string }
+    ShiftClosePayload:
+      type: object
+      description: |
+        entityType shift_close, create only, once per shift. `expectedCashPaise` is what the device computed
+        (opening float + cash received - cash refunded since open); the server recomputes it from synced payments.
+        A non-zero variance is flagged (cash_variance) so the owner sees it; a client/server disagreement is
+        flagged too (shift_expected_mismatch). Neither rejects the close.
+      required: [shiftId, declaredCashPaise, expectedCashPaise]
+      properties:
+        shiftId: { type: string, format: uuid }
+        declaredCashPaise: { type: integer, format: int64, minimum: 0 }
+        expectedCashPaise: { type: integer, format: int64 }
+        closedAt: { type: string, format: date-time }
+        note: { type: string }
+    Approver:
+      type: object
+      required: [userId, displayName, pinSalt, pinHash, iterations]
+      properties:
+        userId: { type: string, format: uuid }
+        displayName: { type: string }
+        pinSalt: { type: string, format: byte, description: base64 }
+        pinHash: { type: string, format: byte, description: 'base64 of PBKDF2-HMAC-SHA256(pin, salt, iterations), 32 bytes' }
+        iterations: { type: integer }
+    MasterProduct:
+      type: object
+      required: [barcode, name]
+      properties:
+        barcode: { type: string }
+        name: { type: string }
+        localName: { type: [string, 'null'] }
+        brand: { type: [string, 'null'] }
+        category: { type: [string, 'null'] }
+        hsn: { type: [string, 'null'] }
+        mrpPaise: { type: [integer, 'null'], format: int64 }
+        unit: { $ref: '#/components/schemas/UomUnit' }
+        uom: { oneOf: [{ $ref: '#/components/schemas/UomSpec' }, { type: 'null' }] }
     PartyPayload:
       type: object
       description: |
@@ -1588,6 +1722,16 @@ components:
           minItems: 1
           maxItems: 500
           items: { $ref: '#/components/schemas/InvoiceLine' }
+    CreditNoteLine:
+      type: object
+      required: [invoiceLineNo, productId, qtyMilli, taxPaise, lineTotalPaise]
+      properties:
+        invoiceLineNo: { type: integer, minimum: 1 }
+        productId: { type: string, format: uuid }
+        qtyMilli: { type: integer, format: int64, minimum: 1 }
+        taxRateBp: { type: integer, minimum: 0, maximum: 10000, default: 0 }
+        taxPaise: { type: integer, format: int64, minimum: 0 }
+        lineTotalPaise: { type: integer, format: int64, minimum: 0 }
     CreditNotePayload:
       type: object
       description: entityType credit_note, create only. Reason is mandatory; the owner's approval is expected.
@@ -1598,8 +1742,13 @@ components:
         invoiceId: { type: string, format: uuid }
         partyId: { type: [string, 'null'], format: uuid }
         reason: { type: string, minLength: 1 }
-        totalPaise: { type: integer, format: int64, minimum: 1 }
-        lines: { type: array, items: { type: object, additionalProperties: true } }
+        totalPaise: { type: integer, format: int64, minimum: 1, description: 'Tax-inclusive amount credited = sum(lines.lineTotalPaise)' }
+        lines:
+          type: array
+          description: |
+            Returned lines, each referring to the original invoice line. Tax is reversed at the rate the invoice
+            charged. Cumulative returned quantity per invoice line above the invoiced quantity is flagged.
+          items: { $ref: '#/components/schemas/CreditNoteLine' }
         approval: { $ref: '#/components/schemas/Approval' }
     PurchaseReceiptPayload:
       type: object

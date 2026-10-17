@@ -86,6 +86,7 @@ class LedgerProjectionPropertyIT extends ApiIT {
 
 	@Test
 	void productFieldsConvergeToThePerFieldNewestWriteInAnyOrder() {
+		final String[] UNITS = { "piece", "packet", "kg", "litre", "box" };
 		Property.check(25, 5000, seed -> {
 			Random rnd = new Random(seed);
 			Seed tenant = seedTenant();
@@ -115,7 +116,8 @@ class LedgerProjectionPropertyIT extends ApiIT {
 				List<Write> writes = new ArrayList<>();
 				for (String f : fields) {
 					if (rnd.nextInt(100) < 50 || (i == 0 && f.equals("name"))) {
-						String value = f + "-" + i;
+						// unit must be one of the contract's UomUnit values (docs/adr/0011); the other fields are free text
+						String value = f.equals("unit") ? UNITS[i % UNITS.length] : f + "-" + i;
 						payload.put(f, value);
 						writes.add(new Write(millis, counter, node, f, value));
 					}
@@ -141,7 +143,7 @@ class LedgerProjectionPropertyIT extends ApiIT {
 
 			var row = inTenant(tenant.tenant(), () -> jdbc.queryForMap("SELECT name, barcode, sku, unit FROM product WHERE id = ?", product));
 			for (String f : fields) {
-				Object expected = winner.containsKey(f) ? winner.get(f).value() : (f.equals("unit") ? "pcs" : null);
+				Object expected = winner.containsKey(f) ? winner.get(f).value() : (f.equals("unit") ? "piece" : null);
 				assertThat(row.get(f)).as("field %s", f).isEqualTo(expected);
 			}
 			assertThat(count(tenant, "SELECT count(*) FROM operation_result WHERE status = 'deferred'")).isZero();

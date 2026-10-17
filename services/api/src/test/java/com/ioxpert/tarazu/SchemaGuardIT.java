@@ -25,8 +25,8 @@ import org.springframework.http.MediaType;
  */
 class SchemaGuardIT extends ApiIT {
 
-	/** Platform-owned reference data (docs/adr/0003): the only tables without tenant_id. */
-	private static final Set<String> GLOBAL_TABLES = Set.of("tax_rule", "tax_threshold");
+	/** Platform-owned reference data (docs/adr/0003, 0009): the only tables without tenant_id. */
+	private static final Set<String> GLOBAL_TABLES = Set.of("tax_rule", "tax_threshold", "master_product");
 	/** Login lookup tables (docs/adr/0007): no tenant_id, no privileges for the API role, reachable only through SECURITY DEFINER functions. */
 	private static final Set<String> DIRECTORY_TABLES = Set.of("contact_directory", "otp_throttle");
 	private static final Set<String> NOT_OURS = Set.of("flyway_schema_history");
@@ -34,7 +34,7 @@ class SchemaGuardIT extends ApiIT {
 	/** Evidence tables: rows are never updated or deleted, by anyone. */
 	private static final Set<String> APPEND_ONLY = Set.of("operation_log", "audit_log", "entity_registry", "price_version",
 			"party_merge", "stock_movement", "invoice", "invoice_line", "credit_note", "purchase_receipt", "order_transition",
-			"payment", "khata_entry", "consent_event", "third_party_sharing_log", "tax_rule");
+			"payment", "khata_entry", "consent_event", "third_party_sharing_log", "tax_rule", "shift", "shift_close");
 
 	/** The tenant table is its own tenant: keyed by id. */
 	private static String tenantColumn(String table) {
@@ -143,7 +143,7 @@ class SchemaGuardIT extends ApiIT {
 		assertThat(jdbc.queryForList("""
 				SELECT DISTINCT table_name FROM information_schema.role_table_grants
 				WHERE grantee = current_user AND privilege_type IN ('UPDATE', 'INSERT', 'DELETE', 'TRUNCATE')
-				  AND table_schema = 'public' AND table_name IN ('stock_balance', 'khata_balance', 'tax_rule', 'tax_threshold')
+				  AND table_schema = 'public' AND table_name IN ('stock_balance', 'khata_balance', 'tax_rule', 'tax_threshold', 'master_product')
 				""", String.class)).as("projections and rule tables are read-only for the API").isEmpty();
 	}
 
@@ -163,6 +163,7 @@ class SchemaGuardIT extends ApiIT {
 		UUID party2 = UUID.randomUUID();
 		UUID invoice = UUID.randomUUID();
 		UUID order = UUID.randomUUID();
+		UUID shift = UUID.randomUUID();
 		Map<String, Object> line = m("productId", product, "qtyMilli", 1000, "unitPricePaise", 100, "taxRateBp", 0, "taxPaise", 0, "lineTotalPaise", 100);
 		var res = upload(s, d.product(product, "P"), d.party(party, "A"), d.party(party2, "B"),
 				d.create("price_version", UUID.randomUUID(), m("productId", product, "priceType", "mrp", "amountPaise", 100, "effectiveFrom", "2026-01-01T00:00:00Z")),
@@ -173,10 +174,12 @@ class SchemaGuardIT extends ApiIT {
 				d.create("invoice", invoice, m("series", "S", "number", 1, "docType", "retail_invoice", "invoiceDate", "2026-10-17",
 						"subtotalPaise", 100, "totalPaise", 100, "lines", List.of(line))),
 				d.create("credit_note", UUID.randomUUID(), m("series", "CN", "number", 1, "invoiceId", invoice, "reason", "r", "totalPaise", 10)),
+				d.create("shift", shift, m("openingCashPaise", 500, "openedAt", "2026-10-17T09:00:00Z")),
+				d.create("shift_close", UUID.randomUUID(), m("shiftId", shift, "declaredCashPaise", 550, "expectedCashPaise", 550, "closedAt", "2026-10-17T18:00:00Z")),
 				d.create("purchase_receipt", UUID.randomUUID(), m("series", "P", "number", 1, "receiptDate", "2026-10-17", "totalPaise", 10)),
 				d.create("order", order, m()), d.create("order_transition", UUID.randomUUID(), m("orderId", order, "toState", "confirmed")),
 				d.create("order_transition", UUID.randomUUID(), m("orderId", order, "toState", "delivered")),
-				d.create("product", UUID.randomUUID(), m("unit", "pcs")),
+				d.create("product", UUID.randomUUID(), m("unit", "piece")),
 				d.stock(UUID.randomUUID(), UUID.randomUUID(), 1, "opening"));
 		assertThat(res.get("rejected").asInt()).isEqualTo(1);
 		assertThat(res.get("deferred").asInt()).isEqualTo(1);

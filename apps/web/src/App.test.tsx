@@ -1,25 +1,21 @@
-import { render, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { App } from './App'
+import { initI18n } from './i18n'
 
-beforeEach(() => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'UP' }) }))
-  Object.defineProperty(navigator, 'storage', {
-    configurable: true,
-    value: {
-      persisted: vi.fn().mockResolvedValue(true),
-      persist: vi.fn(),
-      estimate: vi.fn().mockResolvedValue({ usage: 1048576, quota: 104857600 }),
-    },
-  })
+beforeAll(async () => {
+  await initI18n()
 })
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => localStorage.clear())
 
 describe('App', () => {
-  it('shows the product name and live system status', async () => {
+  it('asks an unlinked device for its device code, and nothing else needs the network', async () => {
     render(<App />)
-    expect(screen.getByRole('heading', { name: 'Tarazu OS' })).toBeInTheDocument()
-    await waitFor(() => expect(screen.getByText(/persistent \(1 MB of 100 MB\)/)).toBeInTheDocument())
-    await waitFor(() => expect(screen.getByText('up')).toBeInTheDocument())
+    expect(await screen.findByTestId('setup-screen')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Connect this device' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Connect' })).toBeDisabled()
+    await userEvent.type(screen.getByTestId('setup-token'), 'tzd.x')
+    expect(screen.getByRole('button', { name: 'Connect' })).toBeEnabled()
   })
 })

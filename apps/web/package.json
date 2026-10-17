@@ -12,23 +12,33 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "gen:api": "openapi-typescript ../../packages/contract/openapi.yaml -o src/api/schema.d.ts"
+    "gen:api": "openapi-typescript ../../packages/contract/openapi.yaml -o src/api/schema.d.ts",
+    "build:starter-pack": "node scripts/build-starter-pack.mjs",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@journeyapps/wa-sqlite": "^2.0.7",
     "@powersync/react": "^2.0.2",
     "@powersync/web": "^2.4.2",
+    "i18next": "^26.4.7",
+    "qrcode-generator": "^2.0.4",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "react-i18next": "^17.0.21",
+    "zxing-wasm": "^3.1.5"
   },
   "devDependencies": {
+    "@playwright/test": "1.56.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
+    "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "eslint": "^10.13.0",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "fast-check": "^4.10.2",
     "jsdom": "^30.1.3",
     "openapi-typescript": "^7.13.0",
     "typescript": "~5.9.3",

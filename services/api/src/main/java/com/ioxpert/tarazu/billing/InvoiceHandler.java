@@ -43,7 +43,11 @@ class InvoiceHandler implements EntityOperationHandler {
 	private final BusinessDirectory businesses;
 	private final TaxRules taxRules;
 
-	InvoiceHandler(JdbcClient jdbc, JsonMapper json, BusinessDirectory businesses, TaxRules taxRules) {
+	private final long maxUnapprovedDiscountBp;
+
+	InvoiceHandler(JdbcClient jdbc, JsonMapper json, BusinessDirectory businesses, TaxRules taxRules,
+			@org.springframework.beans.factory.annotation.Value("${tarazu.billing.max-unapproved-discount-bp:500}") long maxUnapprovedDiscountBp) {
+		this.maxUnapprovedDiscountBp = maxUnapprovedDiscountBp;
 		this.jdbc = jdbc;
 		this.json = json;
 		this.businesses = businesses;
@@ -142,7 +146,11 @@ class InvoiceHandler implements EntityOperationHandler {
 					"roundOffPaise", roundOff, "totalPaise", total));
 		}
 
-		boolean discounted = discount > 0 || lines.stream().anyMatch(l -> l.discountPaise() > 0);
+		// A discount within the unapproved band (default 5% of gross, the same default the counter enforces locally)
+		// is a cashier's call; only a larger one needs the owner PIN. See ADR 0009.
+		long gross = lines.stream().mapToLong(l -> (l.qtyMilli() * l.unitPricePaise() + 500) / 1000).sum();
+		long lineDiscounts = lines.stream().mapToLong(Line::discountPaise).sum() + discount;
+		boolean discounted = lineDiscounts > 0 && lineDiscounts * 10_000 > gross * maxUnapprovedDiscountBp;
 		boolean backdated = invoiceDate.isBefore(op.hlc().instant().atZone(IST).toLocalDate());
 		if (discounted || backdated) {
 			boolean approved = Approvals.valid(ctx, op.payload());

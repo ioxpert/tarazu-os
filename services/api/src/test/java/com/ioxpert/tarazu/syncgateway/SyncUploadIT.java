@@ -76,7 +76,7 @@ class SyncUploadIT extends ApiIT {
 		var device = new Ops(seed);
 		UUID good = UUID.randomUUID();
 		var response = upload(seed,
-				device.create("product", UUID.randomUUID(), Ops.m("unit", "pcs")), // name missing
+				device.create("product", UUID.randomUUID(), Ops.m("unit", "piece")), // name missing
 				device.create("no_such_thing", UUID.randomUUID(), Ops.m()),
 				device.product(good, "Sugar"));
 

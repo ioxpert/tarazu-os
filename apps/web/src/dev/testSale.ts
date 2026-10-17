@@ -17,7 +17,7 @@ export interface SaleContext {
 /** One-time master data so a sale has something to refer to. */
 export function buildCatalogue(ctx: Pick<SaleContext, 'productId' | 'partyId' | 'actorUserId'>): WriteItem[] {
   return [
-    item({ entityType: 'product', entityId: ctx.productId, opType: 'create', actorUserId: ctx.actorUserId, payload: { name: 'Harness Biscuit 100g', unit: 'pcs', hsn: '1905' } }),
+    item({ entityType: 'product', entityId: ctx.productId, opType: 'create', actorUserId: ctx.actorUserId, payload: { name: 'Harness Biscuit 100g', unit: 'piece', hsn: '1905' } }),
     item({ entityType: 'party', entityId: ctx.partyId, opType: 'create', actorUserId: ctx.actorUserId, payload: { name: 'Harness Customer', partyType: 'customer' } }),
   ]
 }

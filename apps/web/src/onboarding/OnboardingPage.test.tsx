@@ -140,7 +140,7 @@ describe('sign-up', () => {
     await fillDetails()
     fireEvent.change(await screen.findByLabelText(/code sent to a\*\*\*@x.in/i), { target: { value: '111111' } })
     fireEvent.click(screen.getByRole('button', { name: /confirm email/i }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(text)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(text))
   })
 
   it('counts down before a code can be sent again, then resends', async () => {
@@ -161,7 +161,7 @@ describe('sign-up', () => {
   it('shows the already-have-an-account message', async () => {
     renderPage({ ...both, 'POST /v1/auth/signup/start': () => ({ status: 409, body: { code: 'contact_in_use', detail: 'x' } }) })
     await fillDetails()
-    expect(await screen.findByRole('alert')).toHaveTextContent(/already has an account/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/already has an account/i))
   })
 
   it('either mode needs at least one contact', async () => {
@@ -169,7 +169,7 @@ describe('sign-up', () => {
     fireEvent.change(await screen.findByLabelText(/your name/i), { target: { value: 'A' } })
     fireEvent.change(screen.getByLabelText(/business name/i), { target: { value: 'B' } })
     fireEvent.click(screen.getByRole('button', { name: /send code/i }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/email, a phone number, or both/i)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/email, a phone number, or both/i))
     expect(api.calls.some((c) => c.path.includes('signup/start'))).toBe(false)
   })
 })

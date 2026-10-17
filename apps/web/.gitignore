@@ -1,1 +1,4 @@
 dist-smoke
+dist-e2e
+test-results
+playwright-report

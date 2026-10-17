@@ -481,6 +481,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/identity/approvers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Owner PIN verifiers so a device can check an approval offline
+         * @description Active owners with a PIN set, with the PBKDF2-HMAC-SHA256 parameters (docs/adr/0005). The device caches
+         *     these and verifies an owner PIN locally when a cashier discount above policy, a return or a back-dated
+         *     bill needs approval and the network is down. Device credential only; never returned to a browser session.
+         */
+        get: operations["listApprovers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/master/{barcode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Look a barcode up in the platform product master
+         * @description Global reference data (docs/adr/0006), the same rows for every merchant. Used to pre-fill the add-item
+         *     form for a barcode the device has never seen. 404 when the master has no such barcode.
+         */
+        get: operations["getMasterProduct"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/identity/audit-log": {
         parameters: {
             query?: never;
@@ -776,6 +819,8 @@ export interface components {
              * @example order_transition
              * @example payment
              * @example khata_entry
+             * @example shift
+             * @example shift_close
              */
             entityType: string;
             /** Format: uuid */
@@ -784,7 +829,7 @@ export interface components {
             opType: "create" | "update" | "void";
             schemaVersion: number;
             /** @description Shape depends on entityType; the first matching schema documents it. */
-            payload: components["schemas"]["ProductPayload"] | components["schemas"]["PriceVersionPayload"] | components["schemas"]["PartyPayload"] | components["schemas"]["PartyMergePayload"] | components["schemas"]["StockMovementPayload"] | components["schemas"]["InvoicePayload"] | components["schemas"]["CreditNotePayload"] | components["schemas"]["PurchaseReceiptPayload"] | components["schemas"]["OrderPayload"] | components["schemas"]["OrderTransitionPayload"] | components["schemas"]["PaymentPayload"] | components["schemas"]["KhataEntryPayload"];
+            payload: components["schemas"]["ProductPayload"] | components["schemas"]["PriceVersionPayload"] | components["schemas"]["PartyPayload"] | components["schemas"]["PartyMergePayload"] | components["schemas"]["StockMovementPayload"] | components["schemas"]["InvoicePayload"] | components["schemas"]["CreditNotePayload"] | components["schemas"]["PurchaseReceiptPayload"] | components["schemas"]["OrderPayload"] | components["schemas"]["OrderTransitionPayload"] | components["schemas"]["PaymentPayload"] | components["schemas"]["KhataEntryPayload"] | components["schemas"]["ShiftPayload"] | components["schemas"]["ShiftClosePayload"];
         };
         UploadRequest: {
             operations: components["schemas"]["Operation"][];
@@ -889,6 +934,9 @@ export interface components {
             /** Format: uuid */
             userId?: string | null;
             roles: components["schemas"]["Role"][];
+            storeName?: string | null;
+            /** @description The device's business (null for a tenant-level credential with no store). */
+            business?: components["schemas"]["Business"] | null;
         };
         /** @enum {string} */
         Role: "owner" | "manager" | "cashier" | "purchaser" | "accountant" | "sales_rep" | "delivery_agent";
@@ -902,6 +950,8 @@ export interface components {
             gstMode: components["schemas"]["GstMode"];
             gstin?: string | null;
             stateCode?: string | null;
+            /** @description Merchant UPI address printed on receipts and encoded in payment QR codes */
+            upiVpa?: string | null;
         };
         Business: {
             /** Format: uuid */
@@ -910,6 +960,7 @@ export interface components {
             gstMode: components["schemas"]["GstMode"];
             gstin?: string | null;
             stateCode?: string | null;
+            upiVpa?: string | null;
         };
         StoreRequest: {
             /** Format: uuid */
@@ -1152,25 +1203,121 @@ export interface components {
             approverUserId: string;
             reason: string;
         };
-        /** @description entityType product. create needs name. Fields merge individually by HLC (newest write per field wins). void deactivates. */
+        /**
+         * @description Unit-of-measure chain for a product. Quantities and prices on every document are per `base` unit
+         *     (qtyMilli 1000 = one base unit). `units` lists the other units the item is sold or counted in;
+         *     `qtyMilli` is how many milli-base-units one of that unit holds. Example: piece base, packet 12 pieces,
+         *     case 24 packets = [{unit: packet, qtyMilli: 12000}, {unit: case, qtyMilli: 288000}]. Loose items use a
+         *     weighed base (kg, litre) with sub-units such as g = 1 and ml = 1.
+         */
+        UomSpec: {
+            base: components["schemas"]["UomUnit"];
+            units: {
+                unit: components["schemas"]["UomUnit"];
+                /** Format: int64 */
+                qtyMilli: number;
+            }[];
+        };
+        /** @enum {string} */
+        UomUnit: "piece" | "packet" | "strip" | "bottle" | "dozen" | "kg" | "g" | "litre" | "ml" | "bag" | "box" | "case" | "carton" | "bundle";
+        /**
+         * @description entityType product. create needs name. Fields merge individually by HLC (newest write per field wins).
+         *     void deactivates. `unit` is the default selling unit; `uom` the full chain. `taxRateBp` is the merchant's
+         *     own rate, used only when no server tax rule resolves for `hsn` on the bill date. A starter-pack item
+         *     carries `packSku` so a duplicate seed is detectable.
+         */
         ProductPayload: {
             name?: string;
+            /** @description Name in the merchant language, e.g. Devanagari */
+            localName?: string | null;
+            brand?: string | null;
+            category?: string | null;
             barcode?: string | null;
             sku?: string | null;
+            packSku?: string | null;
             hsn?: string | null;
-            unit?: string;
+            unit?: components["schemas"]["UomUnit"];
+            uom?: components["schemas"]["UomSpec"] | null;
+            /** @description Prices are tax-inclusive (MRP style). Default true. */
+            taxInclusive?: boolean;
+            taxRateBp?: number | null;
+            /** @description Sold by weight or volume */
+            loose?: boolean;
+            /** @description Shown on the billing screen without searching */
+            pinned?: boolean;
             active?: boolean;
         };
         /** @description entityType price_version, create only (append-only, effective-dated). */
         PriceVersionPayload: {
             /** Format: uuid */
             productId: string;
-            /** @enum {string} */
-            priceType: "mrp" | "retail" | "wholesale" | "purchase";
+            /**
+             * @description customer = a negotiated rate for one party (partyId required). Price is per base unit.
+             * @enum {string}
+             */
+            priceType: "mrp" | "retail" | "wholesale" | "purchase" | "customer";
+            /**
+             * Format: uuid
+             * @description Required for priceType customer, null otherwise
+             */
+            partyId?: string | null;
             /** Format: int64 */
             amountPaise: number;
             /** Format: date-time */
             effectiveFrom: string;
+        };
+        /** @description entityType shift, create only. Opens a cash shift on this device with the counted float. */
+        ShiftPayload: {
+            /** Format: int64 */
+            openingCashPaise: number;
+            /** Format: date-time */
+            openedAt?: string;
+            note?: string;
+        };
+        /**
+         * @description entityType shift_close, create only, once per shift. `expectedCashPaise` is what the device computed
+         *     (opening float + cash received - cash refunded since open); the server recomputes it from synced payments.
+         *     A non-zero variance is flagged (cash_variance) so the owner sees it; a client/server disagreement is
+         *     flagged too (shift_expected_mismatch). Neither rejects the close.
+         */
+        ShiftClosePayload: {
+            /** Format: uuid */
+            shiftId: string;
+            /** Format: int64 */
+            declaredCashPaise: number;
+            /** Format: int64 */
+            expectedCashPaise: number;
+            /** Format: date-time */
+            closedAt?: string;
+            note?: string;
+        };
+        Approver: {
+            /** Format: uuid */
+            userId: string;
+            displayName: string;
+            /**
+             * Format: byte
+             * @description base64
+             */
+            pinSalt: string;
+            /**
+             * Format: byte
+             * @description base64 of PBKDF2-HMAC-SHA256(pin, salt, iterations), 32 bytes
+             */
+            pinHash: string;
+            iterations: number;
+        };
+        MasterProduct: {
+            barcode: string;
+            name: string;
+            localName?: string | null;
+            brand?: string | null;
+            category?: string | null;
+            hsn?: string | null;
+            /** Format: int64 */
+            mrpPaise?: number | null;
+            unit?: components["schemas"]["UomUnit"];
+            uom?: components["schemas"]["UomSpec"] | null;
         };
         /**
          * @description entityType party. create needs name. Field-level merge like product. A phone or GSTIN already held by
@@ -1278,6 +1425,19 @@ export interface components {
             approval?: components["schemas"]["Approval"];
             lines: components["schemas"]["InvoiceLine"][];
         };
+        CreditNoteLine: {
+            invoiceLineNo: number;
+            /** Format: uuid */
+            productId: string;
+            /** Format: int64 */
+            qtyMilli: number;
+            /** @default 0 */
+            taxRateBp: number;
+            /** Format: int64 */
+            taxPaise: number;
+            /** Format: int64 */
+            lineTotalPaise: number;
+        };
         /** @description entityType credit_note, create only. Reason is mandatory; the owner's approval is expected. */
         CreditNotePayload: {
             series: string;
@@ -1288,11 +1448,16 @@ export interface components {
             /** Format: uuid */
             partyId?: string | null;
             reason: string;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Tax-inclusive amount credited = sum(lines.lineTotalPaise)
+             */
             totalPaise: number;
-            lines?: {
-                [key: string]: unknown;
-            }[];
+            /**
+             * @description Returned lines, each referring to the original invoice line. Tax is reversed at the rate the invoice
+             *     charged. Cumulative returned quantity per invoice line above the invoiced quantity is flagged.
+             */
+            lines?: components["schemas"]["CreditNoteLine"][];
             approval?: components["schemas"]["Approval"];
         };
         /** @description entityType purchase_receipt, create only. */
@@ -2179,6 +2344,51 @@ export interface operations {
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
             423: components["responses"]["Problem"];
+        };
+    };
+    listApprovers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Approvers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Approver"][];
+                };
+            };
+            401: components["responses"]["Problem"];
+        };
+    };
+    getMasterProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                barcode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The master record */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MasterProduct"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
         };
     };
     listAuditLog: {

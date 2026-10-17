@@ -129,7 +129,7 @@ describe('commitPurchase', () => {
           }
           expect(first<{ q: number }>(sqlite, 'SELECT qty_milli AS q FROM stock_balance WHERE product_id = ?', P1)!.q).toBe(received)
           const bal = first<{ b: number | null }>(sqlite, 'SELECT balance_paise AS b FROM khata_balance WHERE party_id = ?', supplier.id)
-          expect(Number(bal?.b ?? 0)).toBe(-owed)
+          expect(Number(bal?.b ?? 0) + owed).toBe(0) // balance = -owed (avoids -0 vs 0)
         },
       ),
       { numRuns: 20 },

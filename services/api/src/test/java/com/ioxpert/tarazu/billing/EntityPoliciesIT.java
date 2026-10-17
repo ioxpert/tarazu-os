@@ -97,13 +97,14 @@ class EntityPoliciesIT extends ApiIT {
 		var d = new Ops(seed);
 		UUID a = UUID.randomUUID();
 		UUID b = UUID.randomUUID();
+		// separate requests: within one batch the gateway applies in lock order, so "the second one" is not defined
+		var first = upload(seed, d.create("party", a, m("name", "Ramesh", "phone", "+91 98765 43210")));
 		var res = upload(seed,
-				d.create("party", a, m("name", "Ramesh", "phone", "+91 98765 43210")),
 				d.create("party", b, m("name", "Ramesh K", "phone", "09876543210", "gstin", "27AAPFU0939F1ZV")),
 				d.create("party", UUID.randomUUID(), m("name", "Bad GSTIN", "gstin", "NOTAGSTIN")));
-		assertThat(statusOf(res, 0)).isEqualTo("applied");
-		assertThat(statusOf(res, 1)).isEqualTo("flagged");
-		assertThat(res.get("results").get(1).get("code").asString()).contains("party_identity_conflict");
+		assertThat(statusOf(first, 0)).isEqualTo("applied");
+		assertThat(statusOf(res, 0)).isEqualTo("flagged");
+		assertThat(res.get("results").get(0).get("code").asString()).contains("party_identity_conflict");
 
 		assertThat(count(seed, "SELECT count(*) FROM party")).as("never auto-merged").isEqualTo(3);
 		assertThat(count(seed, "SELECT count(*) FROM party WHERE phone = '9876543210'")).isEqualTo(2);
@@ -411,6 +412,28 @@ class EntityPoliciesIT extends ApiIT {
 		assertThat(statusOf(res, 3)).isEqualTo("applied");
 		assertThat(count(seed, "SELECT count(*) FROM purchase_receipt")).as("flagged, never lost").isEqualTo(3);
 		assertThat(openFlags(seed)).containsExactly("permission_violation", "unknown_actor");
+	}
+
+	@Test
+	void aDeviceClockRunningFarAheadCannotPinFieldsForever() throws Exception {
+		Seed seed = seedTenant();
+		var d = new Ops(seed);
+		UUID id = UUID.randomUUID();
+		upload(seed, d.create("product", id, m("name", "Original")));
+		// a phone with a dead RTC battery thinks it is 2099
+		var skewed = new LinkedHashMap<>(d.op("product", id, "update", m("name", "From 2099")));
+		skewed.put("hlc", "2099-01-01T00:00:00.000Z-0000-badclock");
+		var res = upload(seed, List.of(skewed));
+		assertThat(statusOf(res, 0)).isEqualTo("flagged");
+		assertThat(openFlags(seed)).containsExactly("clock_skew");
+		assertThat(count(seed, "SELECT count(*) FROM operation_log WHERE hlc LIKE '2099%'")).as("the log keeps what the device sent").isEqualTo(1);
+
+		// a correct device writing five seconds from now still wins; with the 2099 clock honoured it never could
+		var later = new LinkedHashMap<>(d.op("product", id, "update", m("name", "Corrected")));
+		later.put("hlc", java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(java.time.ZoneOffset.UTC)
+				.format(java.time.Instant.now().plusSeconds(5)) + "-0000-gooddev1");
+		upload(seed, List.of(later));
+		assertThat(inTenant(seed.tenant(), () -> jdbc.queryForObject("SELECT name FROM product WHERE id = ?", String.class, id))).isEqualTo("Corrected");
 	}
 
 	@Test

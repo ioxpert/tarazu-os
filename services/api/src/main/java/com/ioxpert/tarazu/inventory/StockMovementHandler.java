@@ -31,6 +31,11 @@ class StockMovementHandler implements EntityOperationHandler {
 	}
 
 	@Override
+	public boolean registersEntity() {
+		return false;
+	}
+
+	@Override
 	public String entityType() {
 		return "stock_movement";
 	}
@@ -43,6 +48,17 @@ class StockMovementHandler implements EntityOperationHandler {
 			case "purchase", "purchase_return" -> Set.of(Permission.RECORD_PURCHASE);
 			default -> Set.of(Permission.ADJUST_STOCK);
 		};
+	}
+
+	@Override
+	public int lockTier() {
+		return 70;
+	}
+
+	/** Movements of one product in one store contend for the same stock_balance row. */
+	@Override
+	public String lockKey(Operation op) {
+		return op.storeId() + ":" + op.payload().node().path("productId").asString("");
 	}
 
 	@Override

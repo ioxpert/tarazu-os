@@ -104,7 +104,7 @@ class PartyHandler implements EntityOperationHandler {
 			f.put("party_type", type);
 		}
 		if (p.present("phone")) {
-			f.put("phone", p.optText("phone").map(PartyHandler::normalisePhone).orElse(null));
+			f.put("phone", p.optText("phone").map(PartyHandler::normalisePhone).filter(s -> !s.isEmpty()).orElse(null));
 		}
 		if (p.present("gstin")) {
 			f.put("gstin", p.optText("gstin").map(s -> s.toUpperCase().replaceAll("\\s", "")).orElse(null));

@@ -94,6 +94,19 @@ class ConsentIT extends ApiIT {
 	}
 
 	@Test
+	void aFutureDatedGrantCannotOutrankALaterWithdrawal() throws Exception {
+		Seed seed = seedTenant();
+		UUID customer = UUID.randomUUID();
+		var grant = event(customer, "marketing_messages", "grant", "fg");
+		grant.put("occurredAt", "2099-01-01T00:00:00Z"); // device clock far ahead
+		mvc.perform(asOwner(post("/v1/consent/events"), seed).content(json.writeValueAsString(grant))).andExpect(status().isOk());
+		Thread.sleep(20);
+		mvc.perform(asOwner(post("/v1/consent/events"), seed).content(json.writeValueAsString(event(customer, "marketing_messages", "withdraw", "fw"))))
+				.andExpect(status().isOk());
+		mvc.perform(asOwner(get("/v1/consent/subjects/party/" + customer), seed)).andExpect(jsonPath("$.current[0].action").value("withdraw"));
+	}
+
+	@Test
 	void sharingWithAThirdPartyNeedsAnActiveGrantAndIsLogged() throws Exception {
 		Seed seed = seedTenant();
 		UUID customer = UUID.randomUUID();

@@ -33,7 +33,11 @@ public final class OperationContext {
 				.param("t", entityType).param("i", entityId).query(Integer.class).optional().isPresent();
 	}
 
-	/** Declares a dependency: if the entity is unknown the operation is deferred until it arrives. */
+	/**
+	 * Declares a dependency: if the entity is unknown the operation is deferred until it arrives. The gateway wakes
+	 * deferred operations when their parent registers (same batch) and again after commit (another batch), so a
+	 * parent and a child racing in two concurrent requests cannot strand the child.
+	 */
 	public void require(String entityType, UUID entityId) {
 		if (!exists(entityType, entityId)) {
 			throw new MissingDependencyException(entityType, entityId);

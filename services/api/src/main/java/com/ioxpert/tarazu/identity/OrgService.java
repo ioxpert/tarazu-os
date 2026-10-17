@@ -64,8 +64,9 @@ class OrgService {
 		tenantSession.bindCurrentTenant();
 		access.require(Permission.SETTINGS_MANAGE);
 		var tenant = TenantContext.require().value();
+		int written;
 		try {
-			jdbc.sql("""
+			written = jdbc.sql("""
 					INSERT INTO store (id, tenant_id, business_id, name) VALUES (:id, :tenant, :business, :name)
 					ON CONFLICT (tenant_id, id) DO UPDATE SET name = EXCLUDED.name
 					WHERE store.business_id = EXCLUDED.business_id
@@ -74,6 +75,9 @@ class OrgService {
 		}
 		catch (DataIntegrityViolationException ex) {
 			throw ApiException.unprocessable("unknown_business", "Business does not exist for this tenant");
+		}
+		if (written == 0) {
+			throw ApiException.conflict("store_business_immutable", "A store cannot move to another business");
 		}
 		return new StoreView(id, businessId, name);
 	}

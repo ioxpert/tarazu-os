@@ -31,6 +31,8 @@
 		<spring-modulith.version>2.1.1</spring-modulith.version>
 		<!-- JVM runs in UTC everywhere (pgjdbc sends the JVM zone to Postgres; legacy names like Asia/Calcutta can be rejected) -->
 		<argLine>-Duser.timezone=UTC</argLine>
+		<!-- the 100k-operation replay test is tagged "scale" and runs in its own CI job; locally: mvn verify -Dtarazu.it.excludedGroups=none -->
+		<tarazu.it.excludedGroups>scale</tarazu.it.excludedGroups>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -154,6 +156,9 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-failsafe-plugin</artifactId>
+				<configuration>
+					<excludedGroups>${tarazu.it.excludedGroups}</excludedGroups>
+				</configuration>
 				<executions>
 					<execution>
 						<goals>

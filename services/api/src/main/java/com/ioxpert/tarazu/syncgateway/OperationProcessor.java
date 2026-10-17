@@ -14,7 +14,9 @@ import com.ioxpert.tarazu.identity.AuditLog;
 import com.ioxpert.tarazu.syncgateway.UploadResponse.OperationResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.TransientDataAccessException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -35,10 +37,14 @@ class OperationProcessor {
 
 	private static final Logger log = LoggerFactory.getLogger(OperationProcessor.class);
 	private static final int MAX_DRAIN_ROUNDS = 50;
+	private static final int STUCK_DAYS = 3;
 
 	/** Per-batch scratch: entities registered (to wake deferred ops) and role lookups. */
 	static final class Batch {
 		final Set<EntityKey> registered = new HashSet<>();
+		boolean parked;
+		/** Every entity this batch registered; unlike {@code registered} it is not drained, it drives the post-commit sweep. */
+		final Set<EntityKey> everRegistered = new HashSet<>();
 		final Map<String, Set<String>> rolesCache = new HashMap<>();
 	}
 
@@ -67,24 +73,87 @@ class OperationProcessor {
 		this.savepoint.setPropagationBehavior(TransactionDefinition.PROPAGATION_NESTED);
 	}
 
-	/** Store then apply. Returns the acknowledgement for the operation. */
-	OperationResult process(Operation op, String payloadJson, Batch batch) {
-		int inserted = jdbc.sql("""
-				INSERT INTO operation_log (operation_id, tenant_id, store_id, device_id, actor_user_id, local_seq, hlc,
-				                           idempotency_key, entity_type, entity_id, op_type, schema_version, payload)
-				VALUES (:operationId, :tenantId, :storeId, :deviceId, :actor, :localSeq, :hlc,
-				        :idempotencyKey, :entityType, :entityId, :opType, :schemaVersion, CAST(:payload AS jsonb))
-				ON CONFLICT DO NOTHING
-				""")
-				.param("operationId", op.operationId()).param("tenantId", op.tenantId()).param("storeId", op.storeId())
-				.param("deviceId", op.deviceId()).param("actor", op.actorUserId()).param("localSeq", op.localSeq())
-				.param("hlc", op.hlc().raw()).param("idempotencyKey", op.idempotencyKey())
-				.param("entityType", op.entityType()).param("entityId", op.entityId()).param("opType", op.opType())
-				.param("schemaVersion", op.schemaVersion()).param("payload", payloadJson).update();
-		if (inserted == 0) {
-			return duplicate(op);
+	/**
+	 * Stores the whole batch in the immutable operation log with one statement and returns the ids that were new.
+	 * Everything else was received before (same operation id or idempotency key) and is a duplicate.
+	 */
+	Set<UUID> storeAll(List<Operation> ops, List<String> declaredHlcs, List<String> payloadJson) {
+		int n = ops.size();
+		UUID[] ids = new UUID[n];
+		UUID[] stores = new UUID[n];
+		UUID[] devices = new UUID[n];
+		UUID[] actors = new UUID[n];
+		Long[] seqs = new Long[n];
+		String[] hlcs = new String[n];
+		String[] keys = new String[n];
+		String[] types = new String[n];
+		UUID[] entities = new UUID[n];
+		String[] opTypes = new String[n];
+		Integer[] versions = new Integer[n];
+		String[] payloads = payloadJson.toArray(String[]::new);
+		for (int i = 0; i < n; i++) {
+			Operation op = ops.get(i);
+			ids[i] = op.operationId();
+			stores[i] = op.storeId();
+			devices[i] = op.deviceId();
+			actors[i] = op.actorUserId();
+			seqs[i] = op.localSeq();
+			hlcs[i] = declaredHlcs.get(i); // the log keeps what the device sent, not the clamped merge clock
+			keys[i] = op.idempotencyKey();
+			types[i] = op.entityType();
+			entities[i] = op.entityId();
+			opTypes[i] = op.opType();
+			versions[i] = op.schemaVersion();
 		}
-		return apply(op, batch, true);
+		return new HashSet<>(jdbc.sql("""
+				INSERT INTO operation_log (tenant_id, operation_id, store_id, device_id, actor_user_id, local_seq, hlc,
+				                           idempotency_key, entity_type, entity_id, op_type, schema_version, payload)
+				SELECT :tenant, t.operation_id, t.store_id, t.device_id, t.actor_user_id, t.local_seq, t.hlc,
+				       t.idempotency_key, t.entity_type, t.entity_id, t.op_type, t.schema_version, CAST(t.payload AS jsonb)
+				FROM unnest(CAST(:ids AS uuid[]), CAST(:stores AS uuid[]), CAST(:devices AS uuid[]), CAST(:actors AS uuid[]),
+				            CAST(:seqs AS bigint[]), CAST(:hlcs AS text[]), CAST(:keys AS text[]), CAST(:types AS text[]),
+				            CAST(:entities AS uuid[]), CAST(:opTypes AS text[]), CAST(:versions AS integer[]),
+				            CAST(:payloads AS text[]))
+				     AS t(operation_id, store_id, device_id, actor_user_id, local_seq, hlc, idempotency_key, entity_type,
+				          entity_id, op_type, schema_version, payload)
+				ON CONFLICT DO NOTHING
+				RETURNING operation_id
+				""")
+				.param("tenant", ops.get(0).tenantId()).param("ids", ids).param("stores", stores).param("devices", devices)
+				.param("actors", actors).param("seqs", seqs).param("hlcs", hlcs).param("keys", keys).param("types", types)
+				.param("entities", entities).param("opTypes", opTypes).param("versions", versions)
+				.param("payloads", payloads).query(UUID.class).list());
+	}
+
+	/** Acknowledgements for operations that were already stored, looked up in one query. */
+	Map<UUID, OperationResult> duplicateResults(List<Operation> dups) {
+		if (dups.isEmpty()) {
+			return Map.of();
+		}
+		UUID[] ids = dups.stream().map(Operation::operationId).toArray(UUID[]::new);
+		String[] keys = dups.stream().map(Operation::idempotencyKey).toArray(String[]::new);
+		record Known(UUID id, String key, String status) {
+		}
+		List<Known> known = jdbc.sql("""
+				SELECT o.operation_id, o.idempotency_key, r.status FROM operation_log o
+				JOIN operation_result r ON r.tenant_id = o.tenant_id AND r.operation_id = o.operation_id
+				WHERE o.operation_id = ANY(:ids) OR o.idempotency_key = ANY(:keys)
+				""").param("ids", ids).param("keys", keys)
+				.query((rs, i) -> new Known(rs.getObject("operation_id", UUID.class), rs.getString("idempotency_key"),
+						rs.getString("status")))
+				.list();
+		Map<UUID, String> byId = new HashMap<>();
+		Map<String, String> byKey = new HashMap<>();
+		for (Known k : known) {
+			byId.put(k.id(), k.status());
+			byKey.put(k.key(), k.status());
+		}
+		Map<UUID, OperationResult> out = new HashMap<>();
+		for (Operation op : dups) {
+			String status = byId.getOrDefault(op.operationId(), byKey.getOrDefault(op.idempotencyKey(), "applied"));
+			out.put(op.operationId(), new OperationResult(op.operationId(), "duplicate", status, null, null));
+		}
+		return out;
 	}
 
 	/** Re-applies deferred operations whose awaited entity has registered, until nothing more wakes up. */
@@ -101,32 +170,75 @@ class OperationProcessor {
 					  ON r.waiting_entity_type = k.t AND r.waiting_entity_id = k.i
 					WHERE r.status = 'deferred'
 					ORDER BY o.hlc, o.local_seq
+					FOR UPDATE OF r SKIP LOCKED
 					""").param("types", types.toArray(String[]::new)).param("ids", ids.toArray(UUID[]::new))
-					.query((rs, n) -> new Operation(rs.getObject("operation_id", UUID.class),
-							rs.getObject("tenant_id", UUID.class), rs.getObject("store_id", UUID.class),
-							rs.getObject("device_id", UUID.class), rs.getObject("actor_user_id", UUID.class),
-							rs.getLong("local_seq"), Hlc.parse(rs.getString("hlc")), rs.getString("idempotency_key"),
-							rs.getString("entity_type"), rs.getObject("entity_id", UUID.class), rs.getString("op_type"),
-							rs.getInt("schema_version"), new Payload(json.readTree(rs.getString("payload")))))
+					.query((rs, n) -> toOperation(rs))
 					.list();
 			for (Operation op : woken) {
-				apply(op, batch, false);
+				apply(op, batch);
 			}
 		}
 	}
 
-	private OperationResult duplicate(Operation op) {
-		String existing = jdbc.sql("""
-				SELECT r.status FROM operation_log o
-				JOIN operation_result r ON r.tenant_id = o.tenant_id AND r.operation_id = o.operation_id
-				WHERE o.operation_id = :id OR o.idempotency_key = :key
-				ORDER BY (o.operation_id = :id) DESC LIMIT 1
-				""").param("id", op.operationId()).param("key", op.idempotencyKey())
-				.query(String.class).optional().orElse("applied");
-		return new OperationResult(op.operationId(), "duplicate", existing, null, null);
+	/**
+	 * Applies any parked operation whose awaited entity now exists. Run after the upload transaction commits: of two
+	 * concurrent requests, one parking a child and one registering its parent, whichever commits later is guaranteed
+	 * to see the other's committed rows here, so no wake-up is ever lost (also heals a crash between park and wake).
+	 * Cheap: the index covers only deferred rows. Returns how many operations it applied.
+	 */
+	int sweepDeferred(Batch batch) {
+		flagStuck();
+		int applied = 0;
+		for (int round = 0; round < MAX_DRAIN_ROUNDS; round++) {
+			List<Operation> stuck = jdbc.sql("""
+					SELECT o.* FROM operation_result r
+					JOIN operation_log o ON o.tenant_id = r.tenant_id AND o.operation_id = r.operation_id
+					JOIN entity_registry e ON e.tenant_id = r.tenant_id AND e.entity_type = r.waiting_entity_type
+					                      AND e.entity_id = r.waiting_entity_id
+					WHERE r.status = 'deferred'
+					ORDER BY o.hlc, o.local_seq
+					LIMIT 500
+					FOR UPDATE OF r SKIP LOCKED
+					""").query((rs, n) -> toOperation(rs)).list();
+			if (stuck.isEmpty()) {
+				return applied;
+			}
+			for (Operation op : stuck) {
+				apply(op, batch);
+				applied++;
+			}
+			drainDeferred(batch);
+		}
+		return applied;
 	}
 
-	private OperationResult apply(Operation op, Batch batch, boolean fresh) {
+	/**
+	 * A parent that never arrives (its create was rejected, or the device that owns it was lost) would leave a child
+	 * deferred forever, invisible to the merchant. After {@value #STUCK_DAYS} days it becomes a review flag.
+	 */
+	private void flagStuck() {
+		jdbc.sql("""
+				INSERT INTO conflict_flag (tenant_id, kind, scope_key, entity_type, entity_id, operation_id, detail)
+				SELECT o.tenant_id, 'stuck_operation', o.operation_id::text, o.entity_type, o.entity_id, o.operation_id,
+				       jsonb_build_object('waitingFor', r.waiting_entity_type || ' ' || r.waiting_entity_id)
+				FROM operation_result r JOIN operation_log o ON o.tenant_id = r.tenant_id AND o.operation_id = r.operation_id
+				WHERE r.status = 'deferred' AND r.updated_at < now() - make_interval(days => :days)
+				ON CONFLICT (tenant_id, kind, scope_key) WHERE status = 'open' DO NOTHING
+				""").param("days", STUCK_DAYS).update();
+	}
+
+	private Operation toOperation(java.sql.ResultSet rs) throws java.sql.SQLException {
+		Hlc declared = Hlc.parse(rs.getString("hlc"));
+		java.time.Instant receivedAt = rs.getTimestamp("received_at").toInstant();
+		return new Operation(rs.getObject("operation_id", UUID.class), rs.getObject("tenant_id", UUID.class),
+				rs.getObject("store_id", UUID.class), rs.getObject("device_id", UUID.class),
+				rs.getObject("actor_user_id", UUID.class), rs.getLong("local_seq"), declared.effectiveAt(receivedAt),
+				rs.getString("idempotency_key"), rs.getString("entity_type"), rs.getObject("entity_id", UUID.class),
+				rs.getString("op_type"), rs.getInt("schema_version"), new Payload(json.readTree(rs.getString("payload"))),
+				declared.isSkewedAt(receivedAt));
+	}
+
+	OperationResult apply(Operation op, Batch batch) {
 		EntityOperationHandler handler = handlers.get(op.entityType());
 		if (handler == null) {
 			return record(op, "rejected", "unknown_entity_type", "No handler for entity type '" + op.entityType() + "'", null);
@@ -143,7 +255,7 @@ class OperationProcessor {
 				if (r instanceof HandlerResult.Rejected) {
 					status.setRollbackOnly();
 				}
-				else if (op.isCreate()) {
+				else if (op.isCreate() && handler.registersEntity()) {
 					registerEntity(op, batch);
 				}
 				return r;
@@ -155,6 +267,7 @@ class OperationProcessor {
 					ctx.raisedFlags().isEmpty() ? null : String.join(",", ctx.raisedFlags()), null, null);
 		}
 		catch (MissingDependencyException ex) {
+			batch.parked = true;
 			return record(op, "deferred", "missing_dependency", ex.getMessage(), ex);
 		}
 		catch (InvalidPayloadException ex) {
@@ -165,9 +278,22 @@ class OperationProcessor {
 			log.warn("Operation {} violates an integrity rule: {}", op.operationId(), ex.getMostSpecificCause().getMessage());
 			return record(op, "rejected", "integrity_violation", ex.getMostSpecificCause().getMessage(), null);
 		}
+		catch (TransientDataAccessException | DataAccessResourceFailureException ex) {
+			throw ex; // deadlock, timeout, lost connection: the whole batch rolls back and the device retries it unchanged
+		}
+		catch (RuntimeException ex) {
+			// A bug in a handler must not wedge a merchant's whole upload queue behind one operation. The raw op is
+			// already in the immutable log, so it can be re-applied after a fix; the device shows "action required".
+			log.error("Operation {} ({} {}) failed unexpectedly", op.operationId(), op.entityType(), op.opType(), ex);
+			return record(op, "rejected", "internal_error", "The server could not apply this operation; it has been kept for review", null);
+		}
 	}
 
 	private void checkActor(Operation op, EntityOperationHandler handler, OperationContext ctx, Batch batch) {
+		if (op.clockSkewed()) {
+			ctx.flag("clock_skew", op.operationId().toString(), op.entityType(), op.entityId(),
+					Map.of("deviceId", op.deviceId().toString(), "mergedAs", op.hlc().raw()));
+		}
 		if (op.actorUserId() == null) {
 			return;
 		}
@@ -194,6 +320,7 @@ class OperationProcessor {
 				.param("op", op.operationId()).update();
 		if (added == 1) {
 			batch.registered.add(new EntityKey(op.entityType(), op.entityId()));
+			batch.everRegistered.add(new EntityKey(op.entityType(), op.entityId()));
 		}
 	}
 
@@ -212,6 +339,15 @@ class OperationProcessor {
 				.param("wType", waiting == null ? null : waiting.entityType())
 				.param("wId", waiting == null ? null : waiting.entityId()).update();
 		return new OperationResult(op.operationId(), status, null, storedCode, detail);
+	}
+
+	/** Sort key: client order first, then hot-row operations in global lock order (see EntityOperationHandler.lockTier). */
+	String lockOrder(Operation op, int requestIndex) {
+		EntityOperationHandler handler = handlers.get(op.entityType());
+		if (handler == null || handler.lockTier() < 0) {
+			return "0|%06d".formatted(requestIndex);
+		}
+		return "1|%02d|%s|%012d|%06d".formatted(handler.lockTier(), handler.lockKey(op), op.localSeq(), requestIndex);
 	}
 
 	/** Current stored fate of an operation (it may have changed since process() if a deferred op woke up). */

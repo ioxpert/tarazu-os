@@ -13,6 +13,7 @@ import com.ioxpert.tarazu.tenancy.TenantContext;
 import com.ioxpert.tarazu.tenancy.TenantSession;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
@@ -45,7 +46,7 @@ class SyncStatusController {
 			Map<String, Object> detail, Instant createdAt, Instant resolvedAt, String resolutionNote) {
 	}
 
-	record ResolveRequest(@Pattern(regexp = "resolved|dismissed") String status, @NotBlank @Size(max = 500) String note) {
+	record ResolveRequest(@NotNull @Pattern(regexp = "resolved|dismissed") String status, @NotBlank @Size(max = 500) String note) {
 	}
 
 	private final JdbcClient jdbc;

@@ -13,13 +13,15 @@ reviewed starting point and verify them against a real PowerSync service (open q
 
 1. Postgres needs logical replication. In `infra/docker-compose.yml` add to the postgres service
    `command: ["postgres", "-c", "wal_level=logical"]` and recreate it (one-off, local only).
-2. As the DB admin, create a replication role and the publication. **Row-level security applies to every role,
-   including the table owner (FORCE RLS), so the replication role must have `BYPASSRLS`.** It is a read-only
-   replication identity, never used by the API:
+2. As the DB admin, create a replication role and the publication. **Row-level security applies to every role, including
+   the table owner (FORCE RLS). Do not use `BYPASSRLS`** (ADR 0006): give the read-only replication role a SELECT-only policy
+   on exactly the synced tables. It is never used by the API:
    ```sql
-   CREATE ROLE powersync_repl LOGIN REPLICATION BYPASSRLS PASSWORD 'powersync_repl_dev';
-   GRANT SELECT ON product, party, price_version, stock_balance, khata_balance, invoice, invoice_line, payment,
-                   sales_order, tax_rule TO powersync_repl;
+   CREATE ROLE powersync_repl LOGIN REPLICATION PASSWORD 'powersync_repl_dev';
+   -- repeat the GRANT and POLICY for every table in the publication
+   GRANT SELECT ON product TO powersync_repl;
+   CREATE POLICY powersync_read ON product FOR SELECT TO powersync_repl USING (true);
+   -- ... party, price_version, stock_balance, khata_balance, invoice, invoice_line, payment, sales_order, tax_rule
    CREATE PUBLICATION powersync FOR TABLE product, party, price_version, stock_balance, khata_balance, invoice,
                    invoice_line, payment, sales_order, tax_rule;
    ```

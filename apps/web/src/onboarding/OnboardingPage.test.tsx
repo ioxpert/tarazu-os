@@ -200,6 +200,49 @@ describe('sign-in and sign-out', () => {
     expect(api.calls.find((c) => c.path.startsWith('POST /v1/auth/logout'))?.auth).toBe('Bearer tzs.t.s.x')
   })
 
+  describe('setting up a device after a later sign-in', () => {
+    const stored = () => saveSession(session())
+
+    it('uses the only store and registers the device with the session', async () => {
+      stored()
+      const api = renderPage({
+        'GET /v1/auth/otp/config': () => ({ body: config({}) }),
+        'GET /v1/identity/stores': () => ({ body: [{ id: 'store-1', businessId: 'b', name: 'Main' }] }),
+        'PUT /v1/identity/devices/': () => ({ status: 201, body: { id: 'd', storeId: 'store-1', token: 'tzd.t.d.secret' } }),
+      })
+      fireEvent.click(await screen.findByRole('button', { name: /set up this device/i }))
+      await screen.findByText(/this device is set up/i)
+      expect(api.calls.find((c) => c.path.startsWith('PUT /v1/identity/devices/'))?.body).toMatchObject({ storeId: 'store-1' })
+      expect(loadSyncConfig()?.deviceToken).toBe('tzd.t.d.secret')
+    })
+
+    it('asks which store when there are several', async () => {
+      stored()
+      renderPage({
+        'GET /v1/auth/otp/config': () => ({ body: config({}) }),
+        'GET /v1/identity/stores': () => ({
+          body: [
+            { id: 's1', businessId: 'b', name: 'Main' },
+            { id: 's2', businessId: 'b', name: 'Godown' },
+          ],
+        }),
+      })
+      const select = await screen.findByLabelText(/store for this device/i)
+      expect(screen.queryByRole('button', { name: /set up this device/i })).not.toBeInTheDocument()
+      fireEvent.change(select, { target: { value: 's2' } })
+      expect(await screen.findByRole('button', { name: /set up this device/i })).toBeInTheDocument()
+    })
+
+    it('tells a cashier to ask the owner instead of failing', async () => {
+      stored()
+      renderPage({
+        'GET /v1/auth/otp/config': () => ({ body: config({}) }),
+        'GET /v1/identity/stores': () => ({ status: 403, body: { code: 'permission_denied' } }),
+      })
+      expect(await screen.findByText(/ask the owner or a manager/i)).toBeInTheDocument()
+    })
+  })
+
   it('an expired stored session counts as signed out', async () => {
     saveSession(session({ expiresAt: new Date(Date.now() - 1000).toISOString() }))
     expect(loadSession()).toBeNull()

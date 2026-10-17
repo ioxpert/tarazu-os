@@ -61,6 +61,8 @@ export default function OnboardingPage({ apiBase = '/api', fetchImpl }: Onboardi
 
   const [deviceMsg, setDeviceMsg] = useState<string | null>(null)
   const [storeId, setStoreId] = useState<string | null>(null)
+  const [stores, setStores] = useState<{ id: string; name: string }[]>([])
+  const [storesNote, setStoresNote] = useState<string | null>(null)
   const codeRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -196,6 +198,28 @@ export default function OnboardingPage({ apiBase = '/api', fetchImpl }: Onboardi
     })
   }
 
+  // After a plain sign-in we do not know the store yet: ask the server (owners and managers may list stores).
+  useEffect(() => {
+    if (step !== 'done' || !session || storeId) return
+    let live = true
+    api
+      .listStores(session.token)
+      .then((list) => {
+        if (!live) return
+        setStores(list)
+        if (list.length === 1) setStoreId(list[0].id)
+        if (list.length === 0) setStoresNote('No store exists yet.')
+      })
+      .catch((e: unknown) => {
+        if (!live) return
+        setStoresNote(e instanceof ApiProblem && e.status === 403 ? 'Ask the owner or a manager to set up this device.' : messageFor(e))
+      })
+    return () => {
+      live = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, session, storeId])
+
   // a stored session may expire while the page is open
   useEffect(() => {
     if (!session) return
@@ -228,6 +252,22 @@ export default function OnboardingPage({ apiBase = '/api', fetchImpl }: Onboardi
         <p>
           Account <code>{session.tenantId}</code> · {session.roles.join(', ')}
         </p>
+        {!storeId && stores.length > 1 && !deviceMsg && (
+          <p>
+            <label>
+              Store for this device{' '}
+              <select defaultValue="" onChange={(e) => setStoreId(e.target.value || null)}>
+                <option value="">Choose a store</option>
+                {stores.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </p>
+        )}
+        {!storeId && storesNote && !deviceMsg && <p role="status">{storesNote}</p>}
         {storeId && !deviceMsg && (
           <p>
             <button type="button" onClick={setUpDevice} disabled={busy}>

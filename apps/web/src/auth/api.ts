@@ -69,6 +69,7 @@ export function authApi(base: string = DEFAULT_API_BASE, fetchImpl?: typeof fetc
     verifyLogin: (challengeToken: string, code: string) =>
       call<Session>(base, 'POST', '/v1/auth/login/verify', { ...f, body: { challengeToken, code } }),
     logout: (token: string) => call<void>(base, 'POST', '/v1/auth/logout', { ...f, token }),
+    listStores: (token: string) => call<components['schemas']['Store'][]>(base, 'GET', '/v1/identity/stores', { ...f, token }),
     registerDevice: (token: string, deviceId: string, storeId: string, label: string) =>
       call<components['schemas']['DeviceRegistered']>(base, 'PUT', `/v1/identity/devices/${deviceId}`, {
         ...f,

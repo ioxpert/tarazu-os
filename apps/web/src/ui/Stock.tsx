@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { formatQtyMilli, fromBaseMilli } from '../catalogue/uom'
 import { formatRupees } from '../lib/numfmt'
 import { setPrice, pinItem, stockIn } from '../catalogue/repo'
+import { countStock } from '../purchase/stockCount'
+import { toBaseMilli } from '../catalogue/uom'
 import type { CatalogueItem } from '../catalogue/types'
 import { useApp } from './app'
 import { Banner, Button, Header, Keypad, Screen } from './components'
@@ -58,8 +60,13 @@ export default function StockScreen() {
           ))}
         </ul>
       </div>
-      <footer className="screen-footer">
-        <Button variant="primary" icon="plus" className="btn-block" onClick={() => navigate('/stock/new')} data-testid="add-item">{t('stock.addItem')}</Button>
+      <footer className="screen-footer" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+        <Button variant="primary" icon="plus" className="btn-block" onClick={() => navigate('/stock/in')} data-testid="stock-in">{t('stock.cameInAction')}</Button>
+        <div className="tender-row">
+          <Button onClick={() => navigate('/stock/new')} data-testid="add-item">{t('stock.addItem')}</Button>
+          <Button onClick={() => navigate('/stock/purchases')} data-testid="open-purchases">{t('purchase.history')}</Button>
+          <Button onClick={() => navigate('/stock/suppliers')} data-testid="open-suppliers">{t('purchase.suppliers')}</Button>
+        </div>
       </footer>
       {scanning && <CameraScanModal onClose={() => setScanning(false)} onCode={(c) => { setScanning(false); onCode(c) }} />}
     </Screen>
@@ -69,7 +76,7 @@ export default function StockScreen() {
 export function StockBadge({ item }: { item: CatalogueItem }) {
   const { t } = useTranslation()
   if (item.stockMilli === null) return <span className="badge">{t('stock.notCounted')}</span>
-  const shown = formatQtyMilli(fromBaseMilli(item.uom, item.uom.base, item.stockMilli) * 1000)
+  const shown = formatQtyMilli(fromBaseMilli(item.uom, item.uom.base, item.stockMilli))
   if (item.stockMilli < 0 || item.oversold)
     return (
       <span className="badge badge-warn" data-testid="oversold-badge">
@@ -92,7 +99,8 @@ export function ItemDetail({ id }: { id: string }) {
   const { t } = useTranslation()
   const app = useApp()
   const item = app.index.get(id)
-  const [mode, setMode] = useState<'stock' | 'price' | null>(null)
+  const [mode, setMode] = useState<'stock' | 'price' | 'count' | null>(null)
+  const [damage, setDamage] = useState(false)
   const [text, setText] = useState('')
   const [unit, setUnit] = useState(item?.uom.base)
   const [msg, setMsg] = useState<string | null>(null)
@@ -113,6 +121,10 @@ export function ItemDetail({ id }: { id: string }) {
       if (mode === 'stock') {
         await stockIn(rt.writer, ctx, item, text, unit ?? item.uom.base)
         setMsg(t('stock.cameIn'))
+      } else if (mode === 'count') {
+        const counted = toBaseMilli(item.uom, unit ?? item.uom.base, text)
+        const r = await countStock(rt.writer, ctx, item.id, counted, { reason: damage ? 'damage' : 'adjustment' })
+        setMsg(r.deltaMilli === 0 ? t('stock.countMatches') : t('stock.countSaved'))
       } else if (mode === 'price') {
         const p = parseRupeesToPaise(text)
         if (!p) return
@@ -138,17 +150,22 @@ export function ItemDetail({ id }: { id: string }) {
         {item.mrpPaise != null && <div className="row"><span className="row-main">{t('stock.mrp')}</span><span>{formatRupees(item.mrpPaise)}</span></div>}
         <div className="row"><span className="row-main">{t('stock.barcode')}</span><span>{item.barcode ?? '–'}</span></div>
         <Button variant="primary" icon="plus" onClick={() => { setMode('stock'); setText('') }} data-testid="stock-came-in">{t('stock.cameInAction')}</Button>
+        <Button onClick={() => { setMode('count'); setText('') }} data-testid="count-stock">{t('stock.countAction')}</Button>
         <Button onClick={() => { setMode('price'); setText('') }}>{t('stock.changePrice')}</Button>
         <Button icon="star" onClick={() => void pinItem(rt.writer, ctx, item.id, !item.pinned).then(() => app.reloadItems([item.id]))}>
           {item.pinned ? t('stock.unpin') : t('stock.pin')}
         </Button>
       </div>
       {mode && (
-        <Modal title={mode === 'stock' ? t('stock.cameInAction') : t('stock.changePrice')} onClose={() => setMode(null)} testId="stock-modal">
-          {mode === 'stock' && units.length > 1 && (
+        <Modal title={mode === 'stock' ? t('stock.cameInAction') : mode === 'count' ? t('stock.countAction') : t('stock.changePrice')} onClose={() => setMode(null)} testId="stock-modal">
+          {mode === 'count' && <p className="muted">{t('stock.countHint')}</p>}
+          {(mode === 'stock' || mode === 'count') && units.length > 1 && (
             <div className="chips" role="group">
               {units.map((u) => <button type="button" className="chip" key={u} aria-pressed={unit === u} onClick={() => setUnit(u)}>{u}</button>)}
             </div>
+          )}
+          {mode === 'count' && (
+            <label className="row"><input type="checkbox" style={{ width: 24, height: 24 }} checked={damage} onChange={(e) => setDamage(e.target.checked)} />{t('stock.countDamage')}</label>
           )}
           <div className="input num" data-testid="stock-display">{text || ' '}</div>
           <Keypad value={text} onChange={setText} decimal />

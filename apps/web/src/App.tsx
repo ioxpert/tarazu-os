@@ -17,6 +17,7 @@ const ReceiptScreen = lazy(() => import('./ui/Receipt'))
 const ReturnsScreen = lazy(() => import('./ui/Returns'))
 const StockScreen = lazy(() => import('./ui/Stock'))
 const ItemFormScreen = lazy(() => import('./ui/ItemForm'))
+const PurchaseRoutes = lazy(() => import('./ui/Purchase'))
 const ItemDetailScreen = lazy(() => import('./ui/Stock').then((m) => ({ default: ItemDetailRoute(m.ItemDetail) })))
 const KhataScreen = lazy(() => import('./ui/Khata'))
 const ShiftScreen = lazy(() => import('./ui/Shift'))
@@ -60,6 +61,7 @@ function Routes() {
     case 'stock':
       if (route.segments[1] === 'new') return <ItemFormScreen />
       if (route.segments[1] === 'item') return <ItemDetailScreen />
+      if (['in', 'purchases', 'suppliers', 'supplier'].includes(route.segments[1] ?? '')) return <PurchaseRoutes />
       return <StockScreen />
     case 'khata': return <KhataScreen />
     case 'shift': return <ShiftScreen />

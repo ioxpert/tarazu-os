@@ -362,7 +362,7 @@ function LineEditor({ line, item, onClose }: { line: CartLine; item: CatalogueIt
   const { t } = useTranslation()
   const units = item ? unitsOf(item.uom) : [line.unit]
   const [unit, setUnit] = useState<Unit>(line.unit)
-  const [qty, setQty] = useState(() => (item ? formatQtyMilli(fromBaseMilli(item.uom, line.unit, line.qtyMilli) * 1000) : String(line.qtyMilli / 1000)))
+  const [qty, setQty] = useState(() => (item ? formatQtyMilli(fromBaseMilli(item.uom, line.unit, line.qtyMilli)) : String(line.qtyMilli / 1000)))
   const [price, setPrice] = useState(() => (line.unitPricePaise / 100).toFixed(2).replace(/\.00$/, ''))
   const [dKind, setDKind] = useState<'percent' | 'amount'>(line.discount?.kind ?? 'percent')
   const [dText, setDText] = useState(() => (line.discount ? (line.discount.kind === 'percent' ? String(line.discount.bp / 100) : String(line.discount.paise / 100)) : ''))
@@ -407,7 +407,7 @@ function LineEditor({ line, item, onClose }: { line: CartLine; item: CatalogueIt
       {field === 'qty' && units.length > 1 && (
         <div className="chips" role="group" aria-label={t('bill.unit')}>
           {units.map((u) => (
-            <button type="button" key={u} className="chip" aria-pressed={unit === u} onClick={() => { if (item) setQty(formatQtyMilli(fromBaseMilli(item.uom, u, safeMilli(item, unit, qty) ?? 0) * 1000)); setUnit(u) }}>{u}</button>
+            <button type="button" key={u} className="chip" aria-pressed={unit === u} onClick={() => { if (item) setQty(formatQtyMilli(fromBaseMilli(item.uom, u, safeMilli(item, unit, qty) ?? 0))); setUnit(u) }}>{u}</button>
           ))}
         </div>
       )}

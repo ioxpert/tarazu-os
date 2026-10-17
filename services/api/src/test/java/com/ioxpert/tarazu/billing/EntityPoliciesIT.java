@@ -377,6 +377,29 @@ class EntityPoliciesIT extends ApiIT {
 	}
 
 	@Test
+	void purchaseLinesMustPointAtKnownProductsAndATotalThatDoesNotAddUpIsFlaggedNotRefused() throws Exception {
+		Seed seed = seedTenant();
+		var d = new Ops(seed);
+		UUID product = UUID.randomUUID();
+		UUID supplier = UUID.randomUUID();
+		var line = m("productId", product, "qtyMilli", 24_000, "unitCostPaise", 4_000, "lineTotalPaise", 96_000);
+		var res = upload(seed, d.product(product, "Biscuit"), d.party(supplier, "Agarwal Traders"),
+				d.create("purchase_receipt", UUID.randomUUID(), m("series", "PR", "number", 1, "supplierId", supplier, "receiptDate", "2026-10-17",
+						"totalPaise", 96_000, "lines", java.util.List.of(line))),
+				d.create("purchase_receipt", UUID.randomUUID(), m("series", "PR", "number", 2, "supplierId", supplier, "receiptDate", "2026-10-17",
+						"totalPaise", 90_000, "lines", java.util.List.of(line))));
+		assertThat(statusOf(res, 2)).as("adds up").isEqualTo("applied");
+		assertThat(statusOf(res, 3)).as("recorded, flagged for the owner").isEqualTo("flagged");
+		assertThat(openFlags(seed)).contains("purchase_total_mismatch");
+		assertThat(count(seed, "SELECT count(*) FROM purchase_receipt")).isEqualTo(2);
+
+		var unknown = m("productId", UUID.randomUUID(), "qtyMilli", 1_000, "unitCostPaise", 100, "lineTotalPaise", 100);
+		var deferred = upload(seed, d.create("purchase_receipt", UUID.randomUUID(), m("series", "PR", "number", 3, "receiptDate", "2026-10-17",
+				"totalPaise", 100, "lines", java.util.List.of(unknown))));
+		assertThat(statusOf(deferred, 0)).as("waits for the product, like every other document").isEqualTo("deferred");
+	}
+
+	@Test
 	void purchaseReceiptsAreImmutableAndNumberedPerDeviceSeries() throws Exception {
 		Seed seed = seedTenant();
 		var d = new Ops(seed);

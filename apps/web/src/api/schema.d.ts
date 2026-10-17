@@ -1523,21 +1523,47 @@ export interface components {
             lines?: components["schemas"]["CreditNoteLine"][];
             approval?: components["schemas"]["Approval"];
         };
-        /** @description entityType purchase_receipt, create only. */
+        /**
+         * @description entityType purchase_receipt, create only (goods received; a return to the supplier is a new document).
+         *     `totalPaise` = sum(lines.lineTotalPaise), tax-inclusive what was paid or owed to the supplier. The stock
+         *     itself arrives as one stock_movement (reason purchase) per line, written in the same local transaction;
+         *     money paid is a `payment` (direction out) and money still owed is a `khata_entry` credit on the supplier
+         *     (balance negative = the merchant owes them). A total that does not match the lines is flagged
+         *     (purchase_total_mismatch), never rejected: the goods are already on the shelf.
+         */
         PurchaseReceiptPayload: {
+            /** @description Device-scoped, e.g. A1B2C3D4-PR-2026-27 */
             series: string;
             /** Format: int64 */
             number: number;
             /** Format: uuid */
             supplierId?: string | null;
+            /** @description The suppliers own bill number */
             supplierRef?: string | null;
             /** Format: date */
             receiptDate: string;
             /** Format: int64 */
             totalPaise: number;
-            lines?: {
-                [key: string]: unknown;
-            }[];
+            lines?: components["schemas"]["PurchaseLine"][];
+        };
+        PurchaseLine: {
+            /** Format: uuid */
+            productId: string;
+            /**
+             * Format: int64
+             * @description Milli-units of the product BASE unit
+             */
+            qtyMilli: number;
+            /**
+             * Format: int64
+             * @description Cost per BASE unit, tax-inclusive
+             */
+            unitCostPaise: number;
+            /**
+             * Format: int64
+             * @description round(qty x unit cost), what this line cost
+             */
+            lineTotalPaise: number;
         };
         /** @description entityType order, create only; afterwards state changes only through order_transition. */
         OrderPayload: {

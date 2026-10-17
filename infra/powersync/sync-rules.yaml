@@ -46,6 +46,9 @@ bucket_definitions:
       # id = the shift_close row id (NOT shift_id: apps/web/src/sync/schema.ts has a stale comment saying shift_id)
       - SELECT id, tenant_id, store_id, device_id, shift_id, declared_cash_paise, expected_cash_paise, variance_paise, closed_at
         FROM shift_close WHERE tenant_id = bucket.merchant_id
+      - SELECT id, tenant_id, store_id, device_id, series, number, supplier_id, supplier_ref, receipt_date, total_paise,
+               lines::text AS lines, hlc, created_at
+        FROM purchase_receipt WHERE tenant_id = bucket.merchant_id
       - SELECT id, tenant_id, store_id, party_id, invoice_id, direction, mode, amount_paise, reference, occurred_at
         FROM payment WHERE tenant_id = bucket.merchant_id
       - SELECT id, tenant_id, store_id, party_id, state, updated_at

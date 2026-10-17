@@ -295,7 +295,21 @@ function AmountDialog({ title, hint, confirm, onDone, onClose }: { title: string
   )
 }
 
-function PayDialog({ owedPaise, onDone, onClose }: { owedPaise: number; onDone: (paise: number, mode: CollectMode, reference: string | null) => Promise<void>; onClose: () => void }) {
+export function PayDialog({
+  owedPaise,
+  onDone,
+  onClose,
+  title,
+  confirmKey = 'khata.gotMoney',
+  modes = ['cash', 'upi', 'card'],
+}: {
+  owedPaise: number
+  onDone: (paise: number, mode: CollectMode, reference: string | null) => Promise<void>
+  onClose: () => void
+  title?: string
+  confirmKey?: string
+  modes?: readonly CollectMode[]
+}) {
   const { t } = useTranslation()
   const [text, setText] = useState(owedPaise > 0 ? String(owedPaise / 100) : '')
   const [fresh, setFresh] = useState(owedPaise > 0)
@@ -310,9 +324,9 @@ function PayDialog({ owedPaise, onDone, onClose }: { owedPaise: number; onDone: 
     setFresh(false)
   }
   return (
-    <Modal title={t('khata.customerPaid')} onClose={onClose} testId="pay-dialog">
+    <Modal title={title ?? t('khata.customerPaid')} onClose={onClose} testId="pay-dialog">
       <div className="chips" role="group" aria-label={t('tender.mode')}>
-        {(['cash', 'upi', 'card'] as const).map((m) => <button type="button" key={m} className="chip" aria-pressed={mode === m} onClick={() => setMode(m)} data-testid={`pay-${m}`}>{t(`tender.${m}`)}</button>)}
+        {modes.map((m) => <button type="button" key={m} className="chip" aria-pressed={mode === m} onClick={() => setMode(m)} data-testid={`pay-${m}`}>{t(`tender.${m}`)}</button>)}
       </div>
       <div className="input num" data-testid="pay-amount">{text ? `₹${text}` : ' '}</div>
       <Keypad value={text} onChange={change} decimal />
@@ -323,7 +337,7 @@ function PayDialog({ owedPaise, onDone, onClose }: { owedPaise: number; onDone: 
           {mode === 'card' && <span className="hint">{t('tender.cardRefHint')}</span>}
         </div>
       )}
-      {paise !== null && paise > owedPaise && owedPaise >= 0 && <Banner kind="info">{t('khata.advanceNote', { amount: formatRupees(paise - owedPaise, { paise: 'auto' }) })}</Banner>}
+      {confirmKey === 'khata.gotMoney' && paise !== null && paise > owedPaise && owedPaise >= 0 && <Banner kind="info">{t('khata.advanceNote', { amount: formatRupees(paise - owedPaise, { paise: 'auto' }) })}</Banner>}
       {error && <Banner kind="error">{error}</Banner>}
       <Button
         variant="primary"
@@ -338,7 +352,7 @@ function PayDialog({ owedPaise, onDone, onClose }: { owedPaise: number; onDone: 
         }}
         data-testid="pay-confirm"
       >
-        {t('khata.gotMoney', { amount: formatRupees(paise ?? 0, { paise: 'auto' }) })}
+        {t(confirmKey, { amount: formatRupees(paise ?? 0, { paise: 'auto' }) })}
       </Button>
     </Modal>
   )

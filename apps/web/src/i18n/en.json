@@ -194,7 +194,12 @@
     "changePrice": "Change price",
     "priceSaved": "New price saved.",
     "pin": "Show on bill screen",
-    "unpin": "Stop showing on bill screen"
+    "unpin": "Stop showing on bill screen",
+    "countAction": "Count stock",
+    "countHint": "Type what is really on the shelf. The difference is saved.",
+    "countDamage": "Lost or damaged stock",
+    "countSaved": "Stock corrected.",
+    "countMatches": "Stock already matches."
   },
   "itemForm": {
     "title": "Add item",
@@ -394,7 +399,56 @@
       "no_open_shift": "No shift is open.",
       "customer_not_found": "Customer not found.",
       "invalid_phone": "Enter a 10 digit mobile number.",
-      "invalid_credit_limit": "Check the credit limit."
+      "invalid_credit_limit": "Check the credit limit.",
+      "supplier_needed": "Choose the supplier for the amount you owe.",
+      "nothing_received": "Add the items that came in.",
+      "invalid_count": "Check the counted quantity."
+    }
+  },
+  "purchase": {
+    "title": "Stock came in",
+    "supplier": "Supplier",
+    "noSupplier": "No supplier (bought in the market)",
+    "supplierBill": "Supplier's bill number (optional)",
+    "addItem": "Search item or scan barcode",
+    "newItem": "Item not found. Add it as a new item",
+    "empty": "Add the items that came in.",
+    "lastCost": "last cost {{cost}}",
+    "margin": "profit {{percent}}%",
+    "sellsBelowCost": "Selling price is below cost",
+    "save": "Save",
+    "howMany": "How many",
+    "costPer": "Cost per {{unit}}",
+    "paidNow": "Paid now?",
+    "billTotal": "Bill total",
+    "mode": {
+      "cash": "Cash",
+      "upi": "UPI",
+      "bank_transfer": "Bank transfer",
+      "cheque": "Cheque"
+    },
+    "owedToSupplier": "You will owe the supplier {{amount}}",
+    "needSupplier": "Choose the supplier to keep the rest as money you owe.",
+    "chooseSupplier": "Choose supplier",
+    "paidTooMuch": "More than the bill total.",
+    "confirmSave": "Save stock received",
+    "searchSupplier": "Search supplier",
+    "createSupplier": "Add \"{{name}}\" as new supplier",
+    "youOwe": "you owe {{amount}}",
+    "paidAhead": "paid ahead {{amount}}",
+    "history": "Bills received",
+    "saved": "Saved {{label}}. Stock is updated.",
+    "none": "No bills yet.",
+    "suppliers": "Suppliers",
+    "totalYouOwe": "You owe suppliers",
+    "noSuppliers": "No suppliers yet.",
+    "addSupplier": "Add supplier",
+    "supplierName": "Supplier name",
+    "iPaid": "I paid the supplier",
+    "paidAmount": "Paid {{amount}}",
+    "line": {
+      "bought": "Bought",
+      "paid": "You paid"
     }
   }
 }

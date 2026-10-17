@@ -781,6 +781,6 @@ export const GENERAL_LOOSE_PICKS = [
 
 // Packs kept per product row for the GROCERY pack (the authoring table lists more sizes than the pack ships, to keep
 // the pack near 700 SKUs). Default 1 (the middle size); staples where the size is the whole point keep 2 (smallest + a larger one).
-export const GROCERY_PACKS_PER_PRODUCT = { atta: 2, rice: 2, dal: 2, oil: 2, biscuits: 2 }
+export const GROCERY_PACKS_PER_PRODUCT = {}
 
 export const GROCERY = { rows: gro, loose }

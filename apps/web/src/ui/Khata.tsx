@@ -18,13 +18,13 @@ export default function KhataScreen() {
     <Screen testId="khata-screen">
       <Header title={t('khata.title')} />
       <div className="screen-body">
-        <div className="total-line"><span>{t('khata.totalOwed')}</span><strong className="num" data-testid="khata-total">{formatRupees(total)}</strong></div>
+        <div className="total-line"><span>{t('khata.totalOwed')}</span><strong className="num" data-testid="khata-total">{formatRupees(total, { paise: 'auto' })}</strong></div>
         {rows.length === 0 && <p className="muted">{t('khata.none')}</p>}
         <ul className="list" data-testid="khata-list">
           {rows.map((r) => (
             <li key={r.id} className="row" data-testid="khata-row">
               <span className="row-main"><span className="row-title">{r.name}</span><span className="muted">{r.phone ?? ''}</span></span>
-              <strong className="num">{t('khata.owes', { amount: formatRupees(r.balancePaise) })}</strong>
+              <strong className="num">{t('khata.owes', { amount: formatRupees(r.balancePaise, { paise: 'auto' }) })}</strong>
             </li>
           ))}
         </ul>

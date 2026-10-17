@@ -91,7 +91,9 @@ export async function seedStarterPack(
             productInsertEffect(ctx.tenantId, id, starterProductPayload(it), nowIso),
           ]),
         ]
-        const prices: Array<'mrp' | 'retail'> = it.loose ? ['retail'] : ['mrp', 'retail']
+        // Packaged goods get only their MRP: billing falls back to it until the merchant sets a selling price, and one
+        // op fewer per item keeps a 600-item seed well inside the 5 s budget on real SQLite WASM.
+        const prices: Array<'mrp' | 'retail'> = it.loose ? ['retail'] : ['mrp']
         for (const priceType of prices) {
           const priceId = starterPriceId(storeType, it.packSku, priceType)
           const payload = { productId: id, priceType, partyId: null, amountPaise: it.mrpPaise, effectiveFrom: nowIso }

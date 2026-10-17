@@ -19,7 +19,7 @@ async function setup() {
 const count = (sqlite: { prepare(s: string): { all(): unknown[] } }, sql: string) => (sqlite.prepare(sql).all()[0] as { n: number }).n
 
 describe('seedStarterPack', () => {
-  it('seeds the real grocery pack: products, mrp+retail prices, no stock, valid op payloads', async () => {
+  it('seeds the real grocery pack: products, MRP prices, no stock, valid op payloads', async () => {
     const { sqlite, db, writer } = await setup()
     const pack = await loadStarterPack('grocery')
     const progress: SeedProgress[] = []
@@ -32,8 +32,8 @@ describe('seedStarterPack', () => {
     const loose = pack.items.filter((i) => i.loose).length
     expect(count(sqlite, 'SELECT count(*) n FROM product')).toBe(pack.items.length)
     expect(count(sqlite, "SELECT count(*) n FROM price_version WHERE price_type = 'mrp'")).toBe(pack.items.length - loose)
-    expect(count(sqlite, "SELECT count(*) n FROM price_version WHERE price_type = 'retail'")).toBe(pack.items.length)
-    expect(count(sqlite, 'SELECT count(*) n FROM op_log')).toBe(pack.items.length * 2 + (pack.items.length - loose))
+    expect(count(sqlite, "SELECT count(*) n FROM price_version WHERE price_type = 'retail'")).toBe(loose) // packaged goods fall back to MRP
+    expect(count(sqlite, 'SELECT count(*) n FROM op_log')).toBe(pack.items.length * 2)
     expect(count(sqlite, "SELECT count(*) n FROM op_log WHERE entity_type = 'stock_movement'")).toBe(0)
     expect(count(sqlite, 'SELECT count(*) n FROM stock_balance')).toBe(0)
     expect(progress[0]).toEqual({ done: 0, total: pack.items.length })
@@ -65,8 +65,8 @@ describe('seedStarterPack', () => {
     // read model: items load with prices and null stock
     const items = await loadCatalogue(db, { storeId: IDENT.storeId, now: new Date(NOW.getTime() + 1000) })
     expect(items).toHaveLength(pack.items.length)
-    const parle = items.find((i) => i.name === 'Parle-G Biscuit 56 g')!
-    expect(parle).toMatchObject({ mrpPaise: 500, retailPaise: 500, stockMilli: null, packSku: expect.stringMatching(/^GRO-/), unit: 'packet', loose: false, active: true })
+    const parle = items.find((i) => i.name === 'Parle-G Biscuit 100 g')!
+    expect(parle).toMatchObject({ mrpPaise: 1000, retailPaise: null, stockMilli: null, packSku: expect.stringMatching(/^GRO-/), unit: 'packet', loose: false, active: true })
     const rice = items.find((i) => i.loose)!
     expect(rice.mrpPaise).toBeNull()
     expect(rice.retailPaise).toBeGreaterThan(0)

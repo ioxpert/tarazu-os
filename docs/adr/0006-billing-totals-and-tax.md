@@ -83,3 +83,10 @@ ever written into it (rule 10).
 - Whether `tax_rate_mismatch` should apply to composition and non-GST merchants who record an HSN.
 - Cess: `tax_rule.cess_bp` is synced but not yet applied to line totals.
 - Source of the master data (licensed catalogue, crowd-sourced from consenting merchants) and its update cadence.
+
+## Addendum: unapproved discount band (server)
+The counter lets a cashier give up to `policy.maxCashierDiscountBp` (default 5% of gross, editable in Settings) without
+a PIN. The server now flags `approval_required` for a discount only above `tarazu.billing.max-unapproved-discount-bp`
+(default 500) or for a back-dated bill. Before this change any discount without an approval was flagged, so every
+in-policy cashier discount raised a false review item. The policy is still device-local; syncing it as a tenant setting
+is an open question in the PR.

@@ -155,8 +155,8 @@ export default function TenderScreen() {
   }
 
   const modeSummary = (m: Active): string => {
-    if (m === 'cash') return formatRupees(cashTendered)
-    return explicit(m) > 0 ? formatRupees(explicit(m)) : '–'
+    if (m === 'cash') return formatRupees(cashTendered, { paise: 'auto' })
+    return explicit(m) > 0 ? formatRupees(explicit(m), { paise: 'auto' }) : '–'
   }
 
   return (

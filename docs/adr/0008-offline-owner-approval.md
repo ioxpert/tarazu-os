@@ -55,3 +55,11 @@ later, when the operation syncs, so the PIN has to be verifiable on the device.
 - Refresh policy: on every sync, daily, or on app start; and a maximum age after which a cached verifier is not trusted.
 - Should the lockout counter also exist on the device (five wrong owner PINs lock approval for 15 minutes locally)?
 - Do managers get approval rights for small amounts (a tiered policy) once staff login exists?
+
+## Update (hardening decided)
+- Owner PINs need at least 6 digits (`422 owner_pin_too_short`); other roles keep 4 to 8. A PIN set while the user was not an owner is not re-checked when
+  the owner role is granted later: the owner should set a new PIN then (the hash cannot reveal its length).
+- Every `GET /v1/identity/approvers` is audited (`approvers.fetched`, with the device), so a stolen device token pulling verifiers shows up.
+- Device lockout: five wrong owner PINs lock approval on that device for 15 minutes (`verifyOwnerPinGuarded`, counter in the local-only `device_state`).
+- A cached verifier set older than 30 days is not trusted (`approvers_stale`); the UI asks the cashier to connect once.
+- Still open: refresh cadence (today: whenever online), longer-than-6-digit or passphrase owners, a manager tier for small amounts.

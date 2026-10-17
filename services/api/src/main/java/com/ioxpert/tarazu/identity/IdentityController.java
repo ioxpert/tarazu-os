@@ -90,9 +90,10 @@ class IdentityController {
 	private final JdbcClient jdbc;
 	private final TenantSession tenantSession;
 	private final JsonMapper json;
+	private final AuditLog audit;
 
 	IdentityController(DeviceService devices, UserService users, OrgService org, AccessPolicy access,
-			JdbcClient jdbc, TenantSession tenantSession, JsonMapper json) {
+			JdbcClient jdbc, TenantSession tenantSession, JsonMapper json, AuditLog audit) {
 		this.devices = devices;
 		this.users = users;
 		this.org = org;
@@ -100,6 +101,7 @@ class IdentityController {
 		this.jdbc = jdbc;
 		this.tenantSession = tenantSession;
 		this.json = json;
+		this.audit = audit;
 	}
 
 	@GetMapping("/me")
@@ -120,13 +122,15 @@ class IdentityController {
 	 * request never receives them. Active owners (for this store) that have a PIN set; disabled users excluded.
 	 */
 	@GetMapping("/approvers")
-	@Transactional(readOnly = true)
+	@Transactional
 	List<Approver> approvers() {
 		Principal p = TenantContext.principal();
 		if (p.deviceId() == null || p.storeId() == null) {
 			throw ApiException.forbidden("device_credential_required", "Owner PIN verifiers are only served to a registered device");
 		}
 		tenantSession.bindCurrentTenant();
+		// every fetch is audited so a stolen device token pulling verifiers is visible (ADR 0008 open question)
+		audit.record(AuditLog.Entry.of("approvers.fetched", "device", p.deviceId(), null));
 		var encoder = java.util.Base64.getEncoder();
 		return jdbc.sql("""
 				SELECT u.id, u.display_name, u.pin_salt, u.pin_hash, u.pin_iterations

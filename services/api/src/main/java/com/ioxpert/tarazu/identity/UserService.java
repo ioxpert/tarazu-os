@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 class UserService {
 
+	static final int MIN_OWNER_PIN_LENGTH = 6;
+
 	record RoleGrant(String role, UUID businessId, UUID storeId) {
 	}
 
@@ -149,6 +151,10 @@ class UserService {
 		access.require(Permission.USER_MANAGE);
 		requireExists(userId);
 		requireOwnerToTouchOwner(userId);
+		// an owner PIN approves discounts and voids and is cached on devices as an offline-crackable verifier (ADR 0008)
+		if (pin.length() < MIN_OWNER_PIN_LENGTH && access.rolesOf(userId).contains("owner")) {
+			throw ApiException.unprocessable("owner_pin_too_short", "An owner PIN must have at least " + MIN_OWNER_PIN_LENGTH + " digits");
+		}
 		var hashed = hasher.hash(pin);
 		jdbc.sql("""
 				UPDATE app_user SET pin_salt = :salt, pin_hash = :hash, pin_iterations = :iter, pin_set_at = now(),

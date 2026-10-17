@@ -78,3 +78,64 @@ export async function verifyOwnerPin(db: Pick<LocalDb, 'getAll'>, userId: string
   }
   return { ok: false, error: 'wrong_pin' }
 }
+
+// ---- device-side guard (ADR 0008 open questions) ----
+
+/** Five wrong owner PINs lock approvals on THIS device for 15 minutes: offline guessing is otherwise unthrottled. */
+export const MAX_PIN_FAILURES = 5
+export const PIN_LOCK_MS = 15 * 60 * 1000
+/** A cached verifier older than this is not trusted (a changed or removed owner PIN would never reach the device). */
+export const MAX_VERIFIER_AGE_MS = 30 * 24 * 60 * 60 * 1000
+
+const KEY_FAILS = 'approval_fail_count'
+const KEY_LOCKED_UNTIL = 'approval_locked_until'
+
+export type GuardedResult =
+  | VerifyResult
+  | { ok: false; error: 'locked'; lockedUntil: number }
+  | { ok: false; error: 'approvers_stale' }
+
+async function getState(db: Pick<LocalDb, 'getAll'>, key: string): Promise<number> {
+  const rows = await db.getAll<{ value: string }>('SELECT value FROM device_state WHERE id = ?', [key])
+  return rows.length ? Number(rows[0].value) || 0 : 0
+}
+
+async function setState(db: Pick<LocalDb, 'execute'>, key: string, value: number): Promise<void> {
+  await db.execute('INSERT OR REPLACE INTO device_state (id, value) VALUES (?, ?)', [key, String(value)])
+}
+
+/**
+ * verifyOwnerPin plus the device lockout and the verifier age limit. Use this from UI. The counter lives in the
+ * local-only device_state table, so it survives reloads and cannot be reset by going offline.
+ */
+export async function verifyOwnerPinGuarded(
+  db: Pick<LocalDb, 'getAll' | 'execute'>,
+  userId: string | null,
+  pin: string,
+  now: number = Date.now(),
+): Promise<GuardedResult> {
+  const lockedUntil = await getState(db, KEY_LOCKED_UNTIL)
+  if (lockedUntil > now) return { ok: false, error: 'locked', lockedUntil }
+
+  const ages = await db.getAll<{ fetched_at: string }>('SELECT fetched_at FROM approver')
+  if (ages.length > 0 && ages.every((a) => now - Date.parse(a.fetched_at) > MAX_VERIFIER_AGE_MS)) {
+    return { ok: false, error: 'approvers_stale' }
+  }
+
+  const result = await verifyOwnerPin(db, userId, pin)
+  if (result.ok) {
+    await setState(db, KEY_FAILS, 0)
+    return result
+  }
+  if (result.error === 'wrong_pin') {
+    const fails = (await getState(db, KEY_FAILS)) + 1
+    if (fails >= MAX_PIN_FAILURES) {
+      await setState(db, KEY_FAILS, 0)
+      const until = now + PIN_LOCK_MS
+      await setState(db, KEY_LOCKED_UNTIL, until)
+      return { ok: false, error: 'locked', lockedUntil: until }
+    }
+    await setState(db, KEY_FAILS, fails)
+  }
+  return result
+}

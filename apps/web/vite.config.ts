@@ -2,10 +2,28 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { buildCsp } from './csp'
+
+// Production builds only: the dev server needs inline scripts for HMR.
+const cspMeta = (): import('vite').Plugin => ({
+  name: 'tarazu-csp',
+  apply: 'build',
+  transformIndexHtml: () => [
+    {
+      tag: 'meta',
+      attrs: {
+        'http-equiv': 'Content-Security-Policy',
+        content: buildCsp((process.env.VITE_CSP_CONNECT ?? '').split(/[\s,]+/).filter(Boolean)),
+      },
+      injectTo: 'head-prepend',
+    },
+  ],
+})
 
 export default defineConfig({
   plugins: [
     react(),
+    cspMeta(),
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {

@@ -14,5 +14,5 @@
     "noEmit": true,
     "types": ["vite/client", "vite-plugin-pwa/client", "vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["src", "vite.config.ts", "e2e", "playwright.config.ts"]
+  "include": ["src", "csp.ts", "vite.config.ts", "e2e", "playwright.config.ts"]
 }

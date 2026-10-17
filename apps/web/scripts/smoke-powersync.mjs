@@ -46,6 +46,10 @@ try {
   const context = await browser.newContext()
   const page = await context.newPage()
   page.on('pageerror', (e) => console.log('pageerror:', e.message))
+  // The production build ships a CSP meta (ADR 0014): any violation while the real stack runs is a failure.
+  page.on('console', (m) => {
+    if (/Content Security Policy|violates the following/i.test(m.text())) fail(`CSP violation: ${m.text()}`)
+  })
   const config = {
     apiBase: '/api',
     deviceToken: 'tzd.11111111-1111-4111-8111-111111111111.a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d.smoke',

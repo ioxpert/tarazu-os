@@ -13,7 +13,7 @@ import { CATEGORY_DEFAULTS, GENERAL_LOOSE_PICKS, GENERAL_PICKS, GROCERY, GROCERY
 
 const here = dirname(fileURLToPath(import.meta.url))
 const OUT = join(here, '..', 'src', 'catalogue', 'starterPack')
-const PACK_VERSION = '2026.10.1'
+const PACK_VERSION = '2026.10.2'
 const UNITS = new Set(['piece', 'packet', 'strip', 'bottle', 'dozen', 'kg', 'g', 'litre', 'ml', 'bag', 'box', 'case', 'carton', 'bundle'])
 const CATEGORIES = new Set(Object.keys(CATEGORY_DEFAULTS))
 const NOTE =

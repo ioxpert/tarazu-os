@@ -1,9 +1,18 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ApiProblem } from '../auth/api'
 import { resolveConfig, saveSyncConfig } from '../sync/config'
+import { looksLikePairingCode, redeemPairing } from '../sync/pairing'
 import { Banner, Button, Screen } from './components'
 
-/** First run: link this device to the shop with the device token the owner created. Everything else works offline. */
+/** Server refusals of a pairing code that deserve their own words. */
+const PAIRING_ERRORS: Record<string, string> = {
+  pairing_invalid: 'setup.codeInvalid',
+  pairing_used: 'setup.codeUsed',
+  too_many_requests: 'setup.tooMany',
+}
+
+/** First run: link this device to the shop with the pairing code (or device token) the owner created. Everything else works offline. */
 export default function SetupScreen() {
   const { t } = useTranslation()
   const [token, setToken] = useState('')
@@ -15,10 +24,10 @@ export default function SetupScreen() {
     setBusy(true)
     setError(null)
     try {
-      saveSyncConfig(await resolveConfig(apiBase, token))
+      saveSyncConfig(looksLikePairingCode(token) ? await redeemPairing(apiBase, token) : await resolveConfig(apiBase, token))
       window.location.reload()
-    } catch {
-      setError(t('setup.failed'))
+    } catch (e) {
+      setError(e instanceof ApiProblem && PAIRING_ERRORS[e.code] ? t(PAIRING_ERRORS[e.code]) : t('setup.failed'))
       setBusy(false)
     }
   }

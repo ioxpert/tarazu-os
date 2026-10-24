@@ -11,6 +11,7 @@ Offline-first billing, stock and khata for Indian retail and wholesale. Monorepo
 | `docs` | PRD pointer, ADRs |
 
 ## Run locally
+Quickest: `./scripts/dev.sh` starts Postgres, the API (dev header on), the web app and a seeded dev merchant, then prints a one-time pairing code to type on the setup screen. Ctrl-C stops it. Step by step:
 ```bash
 docker compose -f infra/docker-compose.yml up -d        # Postgres 16 + roles
 cd services/api && mvn spring-boot:run                  # API on :8080

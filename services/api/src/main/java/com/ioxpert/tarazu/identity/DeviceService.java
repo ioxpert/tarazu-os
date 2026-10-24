@@ -57,20 +57,29 @@ class DeviceService {
 			return new Registration(id, storeId, label, null, false);
 		}
 		String secret = newSecret();
+		insert(principal.tenant().value(), id, storeId, label, secret, principal.userId());
+		audit.record(AuditLog.Entry.of("device.registered", "device", id, null).withDetails(Map.of("storeId", storeId)));
+		String token = tokenOf(principal.tenant().value(), id, secret);
+		return new Registration(id, storeId, label, token, true);
+	}
+
+	/** Inserts the device row (only the SHA-256 of the secret is stored). Needs a tenant-bound transaction. */
+	void insert(UUID tenantId, UUID id, UUID storeId, String label, String secret, UUID registeredBy) {
 		try {
 			jdbc.sql("""
 					INSERT INTO device (id, tenant_id, store_id, label, token_hash, registered_by)
 					VALUES (:id, :tenant, :store, :label, :hash, :by)
 					""")
-					.param("id", id).param("tenant", principal.tenant().value()).param("store", storeId)
-					.param("label", label).param("hash", sha256(secret)).param("by", principal.userId()).update();
+					.param("id", id).param("tenant", tenantId).param("store", storeId)
+					.param("label", label).param("hash", sha256(secret)).param("by", registeredBy).update();
 		}
 		catch (DataIntegrityViolationException ex) {
 			throw ApiException.unprocessable("unknown_store", "Store does not exist for this tenant");
 		}
-		audit.record(AuditLog.Entry.of("device.registered", "device", id, null).withDetails(Map.of("storeId", storeId)));
-		String token = DeviceTokenAuthenticator.PREFIX + principal.tenant().value() + "." + id + "." + secret;
-		return new Registration(id, storeId, label, token, true);
+	}
+
+	static String tokenOf(UUID tenantId, UUID deviceId, String secret) {
+		return DeviceTokenAuthenticator.PREFIX + tenantId + "." + deviceId + "." + secret;
 	}
 
 	@Transactional

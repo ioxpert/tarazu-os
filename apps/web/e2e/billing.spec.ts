@@ -356,8 +356,49 @@ test.describe('quantity display', () => {
     await page.goto('/#/bill')
     await page.getByTestId('item-search').fill('parle g')
     await page.getByTestId('item-card').first().click()
+    await page.getByTestId('item-search').fill('parle g') // the box clears after each item
     await page.getByTestId('item-card').first().click() // 2 packets
     await page.getByRole('button', { name: /Edit/ }).first().click()
     await expect(page.getByRole('button', { name: /Quantity: 2/ })).toBeVisible()
+  })
+})
+
+test.describe('fast billing', () => {
+  test('Enter adds the top result and clears the search; an unknown barcode offers to add the item', async ({ page }) => {
+    await readyHome(page)
+    await page.goto('/#/bill')
+    await page.getByTestId('item-search').fill('parle g')
+    await page.getByTestId('item-search').press('Enter')
+    await expect(page.getByTestId('cart-line')).toHaveCount(1)
+    await expect(page.getByTestId('item-search')).toHaveValue('')
+    await page.getByTestId('item-search').fill('1234567890123')
+    await page.getByTestId('item-search').press('Enter')
+    await expect(page.getByText(/1234567890123/)).toBeVisible()
+    await expect(page.getByTestId('cart-line')).toHaveCount(1)
+  })
+
+  test('the bill stays on screen on a phone while you search, and quick cash works out the change', async ({ page }) => {
+    await readyHome(page)
+    await page.goto('/#/bill')
+    for (const q of ['parle g', 'maggi', 'dalda']) {
+      await page.getByTestId('item-search').fill(q)
+      await page.getByTestId('item-search').press('Enter')
+    }
+    await expect(page.getByTestId('cart-line')).toHaveCount(3)
+    const view = page.viewportSize()!
+    const box = (await page.getByTestId('cart-lines').boundingBox())!
+    expect(box.y).toBeLessThan(view.height * 0.7) // the bill starts on the first screen, not under the results
+
+    await page.getByTestId('pay').click()
+    const due = Number((await page.getByTestId('tender-due').innerText()).replace(/[^0-9.]/g, ''))
+    const quick = page.getByTestId('cash-quick')
+    const first = Number((await quick.first().innerText()).replace(/[^0-9.]/g, ''))
+    expect(first).toBeGreaterThan(due)
+    await quick.first().click()
+    await expect(page.getByTestId('change-due')).toContainText(String(first - due))
+    await page.getByTestId('cash-exact').click()
+    await expect(page.getByTestId('change-due')).toHaveCount(0)
+    await page.getByTestId('complete-sale').click()
+    await expect(page.getByTestId('sale-saved')).toBeVisible()
   })
 })

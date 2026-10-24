@@ -4,7 +4,7 @@ import { priceCart } from '../billing/calc'
 import { commitSale } from '../billing/commit'
 import { evaluateDiscount, needsBackdateApproval } from '../billing/discount'
 import { qrMatrix } from '../billing/qr'
-import { settleTenders } from '../billing/tender'
+import { cashSuggestions, settleTenders } from '../billing/tender'
 import type { Tender, TenderMode } from '../billing/types'
 import { buildUpiUri } from '../billing/upi'
 import { formatRupees, parseRupeesToPaise } from '../lib/numfmt'
@@ -190,6 +190,14 @@ export default function TenderScreen() {
         <div className="input num" data-testid="amount-display">
           {amounts[active] !== '' ? `₹${amounts[active]}` : active === 'cash' ? `₹${(cashDue / 100).toString()}` : ' '}
         </div>
+        {active === 'cash' && cashDue > 0 && (
+          <div className="chips" role="group" aria-label={t('tender.quickCash')} style={{ flexWrap: 'wrap' }}>
+            <button type="button" className="chip" aria-pressed={amounts.cash === ''} onClick={() => setAmounts((a) => ({ ...a, cash: '' }))} data-testid="cash-exact">{t('tender.exact')}</button>
+            {cashSuggestions(cashDue).map((p) => (
+              <button type="button" key={p} className="chip" aria-pressed={amounts.cash === String(p / 100)} onClick={() => setAmounts((a) => ({ ...a, cash: String(p / 100) }))} data-testid="cash-quick">₹{p / 100}</button>
+            ))}
+          </div>
+        )}
         <Keypad value={amounts[active]} onChange={setAmount} decimal ariaLabel={t('tender.amount')} />
 
         {active === 'card' && (

@@ -114,6 +114,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* Bill screen: pick on the left, bill on the right when there is room; stacked on a phone. */
 .bill-body { display: grid; grid-template-columns: 1fr; align-content: start; }
 .bill-pick, .bill-cart { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+/* Phone: once the bill has lines, results and bill share the screen and scroll on their own, so the bill is never off-screen. */
+@media (max-width: 799px) {
+  .bill-body.has-lines { grid-template-rows: minmax(0, 2fr) minmax(0, 3fr); overflow: hidden; }
+  .bill-body.has-lines .bill-pick, .bill-body.has-lines .bill-cart { min-height: 0; overflow-y: auto; }
+}
 @media (min-width: 800px) {
   .bill-body { grid-template-columns: 1.3fr 1fr; align-items: start; overflow: hidden; }
   .bill-pick, .bill-cart { max-height: 100%; overflow-y: auto; }

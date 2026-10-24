@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiProblem } from '../auth/api'
-import { looksLikePairingCode, normalisePairingCode, redeemPairing } from './pairing'
+import { createPairing, looksLikePairingCode, normalisePairingCode, redeemPairing } from './pairing'
 
 const TENANT = '00000000-0000-4000-8000-000000000001'
 const STORE = '11111111-1111-4111-8111-111111111111'
@@ -70,5 +70,26 @@ describe('redeemPairing', () => {
     expect(fetchImpl).not.toHaveBeenCalled()
     const used = vi.fn(async () => reply(409, { code: 'pairing_used', detail: 'used' }))
     await expect(redeemPairing('/api', 'ABCD-EFGH', used as unknown as typeof fetch)).rejects.toMatchObject({ status: 409, code: 'pairing_used' })
+  })
+})
+
+describe('createPairing', () => {
+  const config = { apiBase: '/api', deviceToken: 'tzd.t.d.s', storeId: STORE }
+  const owner = { userId: '22222222-2222-4222-8222-222222222222', pin: '4821' }
+
+  it('sends the device token, the owner and the PIN, and returns the code', async () => {
+    const f = vi.fn(async () => reply(201, { code: 'ABCD-EFGH', expiresAt: '2026-01-01T00:10:00Z', storeId: STORE, label: 'Counter 2' }))
+    const made = await createPairing(config, owner, ' Counter 2 ', f as unknown as typeof fetch)
+    expect(made.code).toBe('ABCD-EFGH')
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/v1/identity/device-pairings')
+    expect(init.headers).toMatchObject({ Authorization: 'Bearer tzd.t.d.s', 'X-Staff-Id': owner.userId, 'X-Staff-Pin': '4821' })
+    expect(JSON.parse(init.body as string)).toEqual({ storeId: STORE, label: 'Counter 2' })
+  })
+
+  it('leaves the label out when blank and passes the server refusal on', async () => {
+    const f = vi.fn(async () => reply(401, { code: 'invalid_pin', detail: 'Wrong staff id or PIN' }))
+    await expect(createPairing(config, owner, '  ', f as unknown as typeof fetch)).rejects.toMatchObject({ status: 401, code: 'invalid_pin' })
+    expect(JSON.parse((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).toEqual({ storeId: STORE })
   })
 })

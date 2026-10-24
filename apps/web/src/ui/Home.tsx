@@ -6,6 +6,7 @@ import { useApp } from './app'
 import { PendingShares } from './PendingShares'
 import { Button, BigTile, Screen } from './components'
 import { navigate } from './router'
+import { TodayStrip } from './TodayStrip'
 
 function useOnline() {
   const [online, setOnline] = useState(() => navigator.onLine)
@@ -36,6 +37,7 @@ export default function HomeScreen() {
         {sync.pendingOps > 0 && <span>{t('home.unsent', { count: sync.pendingOps })}</span>}
       </div>
       <PendingShares />
+      <TodayStrip />
       <div className="home">
         <BigTile icon="bill" label={t('home.bill')} onClick={() => navigate('/bill')} testId="home-bill" />
         <BigTile icon="khata" label={t('home.khata')} onClick={() => navigate('/khata')} testId="home-khata" />
@@ -43,6 +45,7 @@ export default function HomeScreen() {
       </div>
       <div className="screen-footer" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
         <Button variant="ghost" onClick={() => navigate('/history')} data-testid="home-history">{t('home.history')}</Button>
+        <Button variant="ghost" onClick={() => navigate('/reports')} data-testid="home-reports">{t('home.reports')}</Button>
         <Button variant="ghost" onClick={() => navigate('/returns')} data-testid="home-returns">{t('home.returns')}</Button>
         <Button variant="ghost" onClick={() => navigate('/shift')} data-testid="home-shift">{t('home.shift')}</Button>
         <Button variant="ghost" icon="gear" onClick={() => navigate('/settings')} data-testid="home-settings">{t('home.settings')}</Button>

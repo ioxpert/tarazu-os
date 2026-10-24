@@ -13,10 +13,10 @@ Product requirements: see `docs/PRD.md` (live PRD linked there is the source of 
 ## Locked rules (do not change without an ADR)
 1. A completed sale never waits for the cloud or an AI service. No LLM call in the billing commit path.
 2. Money paths are append-only: ledgers and invoices are immutable, corrections are new entries. `operation_log` blocks UPDATE/DELETE.
-3. Every table has `tenant_id` + `FORCE ROW LEVEL SECURITY`, with ADR-backed exceptions: the global GST rule tables (ADR 0003) and the hashed login contact directory (ADR 0007). The API connects as `tarazu_app` (non-superuser, non-owner). Bind the tenant with `TenantSession` inside a transaction; never skip it. Entity primary keys are `(tenant_id, id)`.
+3. Every table has `tenant_id` + `FORCE ROW LEVEL SECURITY`, with ADR-backed exceptions: the global GST rule tables (ADR 0003), the hashed login contact directory (ADR 0007) and the hashed pairing-code directory (ADR 0015). The API connects as `tarazu_app` (non-superuser, non-owner). Bind the tenant with `TenantSession` inside a transaction; never skip it. Entity primary keys are `(tenant_id, id)`.
 4. Composite FKs `(tenant_id, id)` so a row can never reference another tenant's parent.
 5. Every client write carries an idempotency key and UUIDv7 operation id. Retries must be safe.
-6. `/v1/**` fails closed: no auth means 401 (devices send the bearer token from registration, owners/staff a session from OTP login, ADR 0004/0007). Only the six OTP handshake paths in `PublicPaths` are public. The dev tenant header exists only behind `tarazu.auth.dev-header-enabled=true`; never enable it in production.
+6. `/v1/**` fails closed: no auth means 401 (devices send the bearer token from registration, owners/staff a session from OTP login, ADR 0004/0007). Only the six OTP handshake paths and the one pairing redemption path (ADR 0015) in `PublicPaths` are public. The dev tenant header exists only behind `tarazu.auth.dev-header-enabled=true`; never enable it in production.
 7. One OpenAPI contract for all clients. Change `openapi.yaml`, run `npm run gen:api` in `apps/web`, commit the result (CI checks drift).
 8. No microservices, Kubernetes or Kafka in the MVP. Add a module, not a service. Split only on a measured trigger.
 9. JVM runs in UTC.

@@ -27,8 +27,8 @@ class SchemaGuardIT extends ApiIT {
 
 	/** Platform-owned reference data (docs/adr/0003, 0009): the only tables without tenant_id. */
 	private static final Set<String> GLOBAL_TABLES = Set.of("tax_rule", "tax_threshold", "master_product");
-	/** Login lookup tables (docs/adr/0007): no tenant_id, no privileges for the API role, reachable only through SECURITY DEFINER functions. */
-	private static final Set<String> DIRECTORY_TABLES = Set.of("contact_directory", "otp_throttle");
+	/** Login and pairing lookup tables (docs/adr/0007, 0015): no tenant_id, no privileges for the API role, reachable only through SECURITY DEFINER functions. */
+	private static final Set<String> DIRECTORY_TABLES = Set.of("contact_directory", "otp_throttle", "pairing_directory");
 	private static final Set<String> NOT_OURS = Set.of("flyway_schema_history");
 
 	/** Evidence tables: rows are never updated or deleted, by anyone. */
@@ -87,9 +87,9 @@ class SchemaGuardIT extends ApiIT {
 		}
 		assertThat(jdbc.queryForList("""
 				SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-				WHERE n.nspname = 'public' AND p.proname IN ('contact_register', 'contact_release', 'contact_lookup', 'otp_throttle_hit')
+				WHERE n.nspname = 'public' AND p.proname IN ('contact_register', 'contact_release', 'contact_lookup', 'otp_throttle_hit', 'pairing_register', 'pairing_lookup', 'otp_throttle_peek')
 				  AND p.prosecdef AND p.proconfig::text LIKE '%search_path%'
-				""", String.class)).as("each is SECURITY DEFINER with a pinned search_path").hasSize(4);
+				""", String.class)).as("each is SECURITY DEFINER with a pinned search_path").hasSize(7);
 	}
 
 	@Test
@@ -155,6 +155,7 @@ class SchemaGuardIT extends ApiIT {
 			jdbc.update("INSERT INTO signup_request (tenant_id, id, owner_name, business_name, required_channels, expires_at) VALUES (?, ?, 'o', 'b', ARRAY['email'], now() + interval '1 hour')", s.tenant(), signup);
 			jdbc.update("INSERT INTO otp_challenge (tenant_id, id, purpose, channel, signup_id, code_hash, expires_at) VALUES (?, ?, 'signup', 'email', ?, 'x'::bytea, now() + interval '1 hour')", s.tenant(), UUID.randomUUID(), signup);
 			jdbc.update("INSERT INTO auth_session (tenant_id, id, user_id, token_hash, expires_at) VALUES (?, ?, ?, 'x'::bytea, now() + interval '1 day')", s.tenant(), UUID.randomUUID(), s.owner());
+			jdbc.update("INSERT INTO device_pairing (tenant_id, id, store_id, created_by, expires_at) VALUES (?, ?, ?, ?, now() + interval '10 minutes')", s.tenant(), UUID.randomUUID(), s.store(), s.owner());
 			return null;
 		});
 		var d = new Ops(s);

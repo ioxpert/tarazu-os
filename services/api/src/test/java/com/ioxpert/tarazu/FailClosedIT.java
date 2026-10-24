@@ -43,7 +43,7 @@ class FailClosedIT extends AbstractPostgresIT {
 				}
 				if (com.ioxpert.tarazu.tenancy.PublicPaths.ALL.contains(pattern)) {
 					publicSeen.add(pattern);
-					continue; // the OTP handshake is deliberately public (ADR 0007); asserted separately below
+					continue; // the OTP handshake and pairing redemption are deliberately public (ADR 0007, 0015); asserted separately below
 				}
 				String path = pattern.replaceAll("\\{[^}]+}", UUID.randomUUID().toString());
 				for (var method : info.getMethodsCondition().getMethods()) {
@@ -68,6 +68,9 @@ class FailClosedIT extends AbstractPostgresIT {
 		mvc.perform(request(HttpMethod.POST, "/v1/auth/signup/start").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"ownerName\":\"A\",\"businessName\":\"B\",\"email\":\"a@b.in\"}"))
 				.andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("otp_not_configured"));
+		mvc.perform(request(HttpMethod.POST, "/v1/pairing/redeem").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"code\":\"ABCD-EFGH\",\"deviceId\":\"" + UUID.randomUUID() + "\",\"secret\":\"" + "a".repeat(43) + "\"}"))
+				.andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("pairing_not_configured"));
 	}
 
 	@Test

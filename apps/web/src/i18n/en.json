@@ -351,11 +351,14 @@
   },
   "setup": {
     "title": "Connect this device",
-    "explain": "Paste the device code the owner created for this counter. After this, billing works without internet.",
-    "token": "Device code",
+    "explain": "Type the pairing code the owner made for this counter (like ABCD-EFGH). After this, billing works without internet.",
+    "token": "Pairing code",
     "server": "Server",
     "connect": "Connect",
-    "failed": "Could not connect. Check the code and the internet, then try again."
+    "failed": "Could not connect. Check the code and the internet, then try again.",
+    "codeInvalid": "That code is wrong or has expired. Ask the owner for a new one.",
+    "codeUsed": "That code was already used. Ask the owner for a new one.",
+    "tooMany": "Too many wrong codes. Wait a few minutes and try again."
   },
   "onboarding": {
     "title": "What kind of shop is this?",

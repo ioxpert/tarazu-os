@@ -110,6 +110,8 @@ export interface ReceiptLine {
 /** Everything a receipt needs, independent of printer width or output (ESC/POS, HTML, PDF, WhatsApp text). */
 export interface ReceiptData {
   kind: 'sale' | 'credit_note'
+  /** A reprint from history: the header says DUPLICATE COPY. */
+  duplicate?: boolean
   business: Pick<MerchantProfile, 'businessName' | 'gstin' | 'address' | 'phone' | 'upiVpa' | 'gstMode'>
   docType: DocType | 'credit_note'
   /** Human label, e.g. "A1B2C3D4/2026-27/17". */

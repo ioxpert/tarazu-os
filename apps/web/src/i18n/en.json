@@ -23,7 +23,8 @@
     "online": "Online",
     "offline": "Offline – billing works as usual",
     "unsent_one": "{{count}} bill waiting to back up",
-    "unsent_other": "{{count}} bills waiting to back up"
+    "unsent_other": "{{count}} bills waiting to back up",
+    "history": "History"
   },
   "bill": {
     "title": "New bill",
@@ -450,5 +451,44 @@
       "bought": "Bought",
       "paid": "You paid"
     }
+  },
+  "history": {
+    "title": "Bill history",
+    "search": "Bill number or customer",
+    "dateFilter": "Date",
+    "modeFilter": "Paid by",
+    "typeFilter": "Type",
+    "from": "From date",
+    "to": "To date",
+    "range": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "7 days",
+      "all": "All",
+      "custom": "Pick dates"
+    },
+    "mode": {
+      "all": "Any",
+      "cash": "Cash",
+      "upi": "UPI",
+      "card": "Card",
+      "credit": "Khata"
+    },
+    "type": {
+      "all": "All",
+      "tax_invoice": "Tax invoice",
+      "bill_of_supply": "Bill of supply",
+      "retail_invoice": "Retail invoice",
+      "credit_note": "Returns"
+    },
+    "empty": "No bills found",
+    "walkIn": "Walk-in",
+    "creditNote": "Return",
+    "returned": "returned",
+    "more": "Show more",
+    "notFound": "This bill is not on this device yet.",
+    "printed": "Duplicate copy printed",
+    "startReturn": "Return items",
+    "noteLine": "Return {{label}}: {{amount}} ({{reason}})"
   }
 }

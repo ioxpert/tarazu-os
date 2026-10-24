@@ -6,7 +6,7 @@ import { parseQtyMilli } from '../catalogue/uom'
 import { useApp } from './app'
 import { Banner, Button, Header, Screen } from './components'
 import { ApprovalModal, errorText, type ApprovalResult, nowMs } from './common'
-import { navigate } from './router'
+import { navigate, useRoute } from './router'
 import { saveLastReceipt } from './receiptStore'
 
 interface InvoiceRow {
@@ -24,6 +24,7 @@ type RefundMode = 'cash' | 'upi' | 'card'
 export default function ReturnsScreen() {
   const { t } = useTranslation()
   const app = useApp()
+  const route = useRoute()
   const [rows, setRows] = useState<InvoiceRow[]>([])
   const [q, setQ] = useState('')
   const [invoice, setInvoice] = useState<ReturnInvoice | null>(null)
@@ -52,6 +53,13 @@ export default function ReturnsScreen() {
     setQty({})
     setInvoice(await loadInvoiceForReturn(app.db, id))
   }
+
+  // deep link from history: #/returns?invoice=<id>
+  const linked = route.query.get('invoice')
+  useEffect(() => {
+    if (!app.db || !linked) return
+    void loadInvoiceForReturn(app.db, linked).then(setInvoice).catch((e) => setError(errorText(t, e)))
+  }, [app.db, linked, t])
 
   const selections = useMemo(() => {
     if (!invoice) return []

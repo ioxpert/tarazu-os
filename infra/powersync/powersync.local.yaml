@@ -1,0 +1,26 @@
+# LOCAL DEV ONLY (docker compose --profile sync). Hostnames are compose service names. The key below is a throwaway dev
+# secret committed on purpose; scripts/dev.sh gives the same value to the API as POWERSYNC_JWT_SECRET. Never reuse it.
+replication:
+  connections:
+    - type: postgresql
+      uri: postgresql://powersync_repl:powersync_repl_dev@postgres:5432/tarazu
+      sslmode: disable
+
+storage:
+  type: postgresql
+  uri: postgresql://powersync_storage:powersync_storage_dev@postgres:5432/powersync_storage
+  sslmode: disable
+
+port: 8081
+
+sync_rules:
+  path: /config/sync-rules.yaml
+
+client_auth:
+  jwks:
+    keys:
+      - kty: oct
+        alg: HS256
+        kid: tarazu-1
+        k: GU4CeB8by_GopYVZUgro0yQv_ucsNgwL57apGuY2BDo
+  audience: ["http://localhost:8081"]

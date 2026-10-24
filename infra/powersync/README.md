@@ -1,4 +1,4 @@
-# PowerSync (draft, not exercised in CI)
+# PowerSync (runs locally in compose; still not exercised in CI)
 
 The device writes operations to a local SQLite op log and uploads them to our API (`POST /v1/sync/upload`).
 PowerSync only streams the server's **read model** back down. Nothing here runs in CI; treat these files as a
@@ -11,28 +11,29 @@ reviewed starting point and verify them against a real PowerSync service (open q
 
 ## Run locally
 
-1. Postgres needs logical replication. In `infra/docker-compose.yml` add to the postgres service
-   `command: ["postgres", "-c", "wal_level=logical"]` and recreate it (one-off, local only).
-2. As the DB admin, create a replication role and the publication. **Row-level security applies to every role, including
-   the table owner (FORCE RLS). Do not use `BYPASSRLS`** (ADR 0006): give the read-only replication role a SELECT-only policy
-   on exactly the synced tables. It is never used by the API:
-   ```sql
-   CREATE ROLE powersync_repl LOGIN REPLICATION PASSWORD 'powersync_repl_dev';
-   -- repeat the GRANT and POLICY for every table in the publication
-   GRANT SELECT ON product TO powersync_repl;
-   CREATE POLICY powersync_read ON product FOR SELECT TO powersync_repl USING (true);
-   -- ... party, price_version, stock_balance, khata_balance, invoice, invoice_line, payment, sales_order, tax_rule
-   CREATE PUBLICATION powersync FOR TABLE product, party, price_version, stock_balance, khata_balance, invoice,
-                   invoice_line, payment, sales_order, tax_rule;
-   ```
-   (Do this in ops tooling, not in a Flyway migration: roles and publications are environment concerns.)
-3. Create the storage database/role from `powersync.example.yaml`, generate a secret
-   (`openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`), put it in `powersync.example.yaml` (`k`) and start the API with
-   `POWERSYNC_URL=http://localhost:8081` and `POWERSYNC_JWT_SECRET=<same secret>`.
-4. Run the service, e.g.
-   `docker run --rm -p 8081:8081 -v $PWD:/config journeyapps/powersync-service:latest start -r unified -c /config/powersync.example.yaml`
-5. Register a device (`PUT /v1/identity/devices/{id}`), open the web app at `http://localhost:5173/#/dev/sync`,
-   paste the device token and press Connect.
+Easiest: `./scripts/dev.sh` starts Postgres (with logical replication), the API (with the PowerSync URL and the dev key), the
+PowerSync service and the web app, then prints a pairing code.
+
+By hand:
+1. `docker compose -f infra/docker-compose.yml up -d postgres` (it runs with `wal_level=logical`; recreate the container once if
+   you had it from before: `up -d --force-recreate postgres`).
+2. Start the API once so Flyway creates the tables, with `POWERSYNC_URL=http://localhost:8081` and `POWERSYNC_JWT_SECRET` set to the
+   `k` value in `powersync.local.yaml` (a throwaway dev key, committed on purpose).
+3. Run `setup.sql` as the Postgres superuser. It is repeatable. It creates the `powersync_repl` and `powersync_storage` roles, the
+   storage database, SELECT-only policies on exactly the synced tables, and the publication. **No `BYPASSRLS`** (ADR 0006): row-level
+   security applies to every role, so the replication role gets policies instead.
+   `docker compose -f infra/docker-compose.yml exec -T postgres psql -U postgres -v ON_ERROR_STOP=1 -f - < infra/powersync/setup.sql`
+4. `docker compose -f infra/docker-compose.yml --profile sync up -d powersync` (service on `http://localhost:8081`).
+5. Pair a device and open the web app; the status badge reads "Backed up" once uploads and downloads are caught up.
+
+The service logs `PSYNC_S1145` ("Row Level Security is enabled ... run ALTER ROLE ... BYPASSRLS") for each table. That is its
+generic check for `BYPASSRLS`; it does not look at policies. Ignore it, as long as the first snapshot copies rows.
+
+| File | Purpose |
+|---|---|
+| `setup.sql` | Roles, storage database, policies and publication (table list must equal `sync-rules.yaml`; a web test checks it) |
+| `powersync.local.yaml` | Service config for the compose service (local dev only, dev key inside) |
+| `powersync.example.yaml` | Example config pointing at host.docker.internal, for running the service outside compose |
 
 ## Things to know
 - The JWT is minted by `GET /v1/sync/credentials` (5 minute TTL, claims `sub`=device, `merchant_id`, `store_id`, `device_id`).

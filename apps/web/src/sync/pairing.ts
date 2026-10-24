@@ -88,3 +88,37 @@ export async function redeemPairing(apiBase: string, rawCode: string, fetchImpl:
   clearPending()
   return { apiBase, deviceToken: paired.token, deviceId: paired.deviceId, storeId: paired.storeId, tenantId: paired.tenantId }
 }
+
+export type PairingCreated = components['schemas']['PairingCreated']
+
+/**
+ * Owner side: asks the server for a code another counter can type. Runs from a paired counter (device credential) and
+ * names the acting owner with their PIN, which the server checks and rate-limits (ADR 0004/0008). Online only.
+ */
+export async function createPairing(
+  config: Pick<SyncConfig, 'apiBase' | 'deviceToken' | 'storeId'>,
+  owner: { userId: string; pin: string },
+  label: string,
+  fetchImpl: typeof fetch = (...a) => fetch(...a),
+): Promise<PairingCreated> {
+  const res = await fetchImpl(`${config.apiBase}/v1/identity/device-pairings`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${config.deviceToken}`,
+      'X-Staff-Id': owner.userId,
+      'X-Staff-Pin': owner.pin,
+    },
+    body: JSON.stringify({ storeId: config.storeId, label: label.trim() || undefined }),
+  })
+  if (!res.ok) {
+    let problem: { code?: string; detail?: string } = {}
+    try {
+      problem = (await res.json()) as typeof problem
+    } catch {
+      /* not json */
+    }
+    throw new ApiProblem(res.status, problem.code ?? String(res.status), problem.detail ?? `Request failed (${res.status})`)
+  }
+  return (await res.json()) as PairingCreated
+}

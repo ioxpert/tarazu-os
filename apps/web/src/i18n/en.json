@@ -493,5 +493,26 @@
     "printed": "Duplicate copy printed",
     "startReturn": "Return items",
     "noteLine": "Return {{label}}: {{amount}} ({{reason}})"
+  },
+  "pair": {
+    "title": "Pair another counter",
+    "hint": "Make a one-time code, then type it on the new counter. Needs the internet and the owner's PIN.",
+    "explain": "Type this code on the new counter's setup screen.",
+    "expires_one": "Works once. Expires in {{count}} minute.",
+    "expires_other": "Works once. Expires in {{count}} minutes.",
+    "expired": "This code has expired. Make a new one.",
+    "another": "Make another code",
+    "owner": "Owner",
+    "label": "Name for the counter (optional)",
+    "labelPlaceholder": "Counter 2",
+    "pin": "PIN of {{name}}",
+    "make": "Make code",
+    "noOwners": "Connect to the internet once so owners can be loaded, then come back.",
+    "wrongPin": "Wrong PIN.",
+    "locked": "Too many wrong PINs. Try again in 15 minutes.",
+    "noPin": "This owner has not set a PIN yet.",
+    "notConfigured": "This server cannot make pairing codes yet.",
+    "failed": "Could not make a code. Try again.",
+    "offline": "No internet. Connect and try again."
   }
 }

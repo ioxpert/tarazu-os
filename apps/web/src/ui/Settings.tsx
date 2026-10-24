@@ -6,6 +6,7 @@ import { LANGUAGES, setLanguage, storedLanguage, type LanguageCode } from '../i1
 import { SyncStatusBadge } from '../sync/SyncStatusBadge'
 import { useApp } from './app'
 import { Banner, Button, Header, Screen } from './components'
+import { PairCounter } from './PairCounter'
 import { connectPrinter, DEFAULT_PRINTER, loadPrinterSettings, savePrinterSettings, type PrinterSettings } from './printing'
 
 export default function SettingsScreen() {
@@ -102,6 +103,8 @@ export default function SettingsScreen() {
           </div>
           <label className="row"><input type="checkbox" style={{ width: 24, height: 24 }} checked={printer.autoPrint} onChange={(e) => void updatePrinter({ autoPrint: e.target.checked })} />{t('settings.autoPrint')}</label>
         </section>
+
+        <PairCounter />
 
         <section className="field">
           <span className="label">{t('settings.sync')}</span>

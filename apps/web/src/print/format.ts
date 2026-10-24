@@ -43,6 +43,7 @@ const SHORT: Record<Unit, string> = {
   case: 'case',
   carton: 'ctn',
   bundle: 'bndl',
+  quintal: 'qtl',
 }
 
 /** Milli-units -> "2", "1.5kg", "0.25L" (up to 3 decimals, trailing zeros trimmed, short unit suffix; pieces have none). */

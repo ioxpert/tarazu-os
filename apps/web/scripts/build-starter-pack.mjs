@@ -14,7 +14,7 @@ import { CATEGORY_DEFAULTS, GENERAL_LOOSE_PICKS, GENERAL_PICKS, GROCERY, GROCERY
 const here = dirname(fileURLToPath(import.meta.url))
 const OUT = join(here, '..', 'src', 'catalogue', 'starterPack')
 const PACK_VERSION = '2026.10.2'
-const UNITS = new Set(['piece', 'packet', 'strip', 'bottle', 'dozen', 'kg', 'g', 'litre', 'ml', 'bag', 'box', 'case', 'carton', 'bundle'])
+const UNITS = new Set(['piece', 'packet', 'strip', 'bottle', 'dozen', 'kg', 'g', 'litre', 'ml', 'bag', 'box', 'case', 'carton', 'bundle', 'quintal'])
 const CATEGORIES = new Set(Object.keys(CATEGORY_DEFAULTS))
 const NOTE =
   'INDICATIVE starter data. mrpPaise is an approximate printed MRP (packaged goods) or an approximate shop rate per kg/litre ' +

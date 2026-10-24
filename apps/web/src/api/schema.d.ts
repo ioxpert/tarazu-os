@@ -1364,7 +1364,7 @@ export interface components {
             }[];
         };
         /** @enum {string} */
-        UomUnit: "piece" | "packet" | "strip" | "bottle" | "dozen" | "kg" | "g" | "litre" | "ml" | "bag" | "box" | "case" | "carton" | "bundle";
+        UomUnit: "piece" | "packet" | "strip" | "bottle" | "dozen" | "kg" | "g" | "litre" | "ml" | "bag" | "box" | "case" | "carton" | "bundle" | "quintal";
         /**
          * @description entityType product. create needs name. Fields merge individually by HLC (newest write per field wins).
          *     void deactivates. `unit` is the default selling unit; `uom` the full chain. `taxRateBp` is the merchant's

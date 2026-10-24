@@ -32,7 +32,7 @@ class ProductHandler implements EntityOperationHandler {
 
 	/** The UomUnit enum of the contract. */
 	static final Set<String> UNITS = Set.of("piece", "packet", "strip", "bottle", "dozen", "kg", "g", "litre", "ml",
-			"bag", "box", "case", "carton", "bundle");
+			"bag", "box", "case", "carton", "bundle", "quintal");
 	private static final int MAX_UOM_UNITS = 8;
 
 	private final JdbcClient jdbc;

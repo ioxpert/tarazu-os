@@ -1759,7 +1759,7 @@ components:
               qtyMilli: { type: integer, format: int64, minimum: 1 }
     UomUnit:
       type: string
-      enum: [piece, packet, strip, bottle, dozen, kg, g, litre, ml, bag, box, case, carton, bundle]
+      enum: [piece, packet, strip, bottle, dozen, kg, g, litre, ml, bag, box, case, carton, bundle, quintal]
     ProductPayload:
       type: object
       description: |

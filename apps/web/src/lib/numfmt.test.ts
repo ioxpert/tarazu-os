@@ -82,5 +82,6 @@ describe('formatQty', () => {
     expect(formatQty(1500, 'kg')).toBe('1.5 kg')
     expect(formatQty(12000, 'piece')).toBe('12 pc')
     expect(formatQty(500, 'litre')).toBe('0.5 L')
+    expect(formatQty(2500, 'quintal')).toBe('2.5 qtl')
   })
 })

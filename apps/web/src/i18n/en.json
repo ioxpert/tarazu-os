@@ -539,6 +539,7 @@
     },
     "avg": "avg",
     "empty": "No sales in this period.",
-    "khataOwed": "{{amount}} owed on khata"
+    "khataOwed": "{{amount}} owed on khata",
+    "sales": "Sales"
   }
 }

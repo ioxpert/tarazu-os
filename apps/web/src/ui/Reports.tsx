@@ -64,7 +64,7 @@ export default function ReportsScreen() {
           <>
             <section className="field" data-testid="rep-summary">
               <div className="row"><span className="row-main">{t('reports.net')}</span><strong className="num" data-testid="rep-net">{money(sum.netPaise)}</strong></div>
-              <div className="row"><span className="row-main">{t('reports.bills', { count: sum.bills })}</span><span className="num">{money(sum.salesPaise)}</span></div>
+              <div className="row"><span className="row-main">{t('reports.sales')} · {t('reports.bills', { count: sum.bills })}</span><span className="num">{money(sum.salesPaise)}</span></div>
               {sum.returnsPaise > 0 && <div className="row"><span className="row-main">{t('reports.returns')}</span><span className="num">−{money(sum.returnsPaise)}</span></div>}
               {(['cash', 'upi', 'card'] as const).filter((m) => sum.byMode[m] !== 0).map((m) => (
                 <div className="row" key={m}><span className="row-main muted">{t(`history.mode.${m}`)}</span><span className="num">{money(sum.byMode[m])}</span></div>
@@ -81,7 +81,7 @@ export default function ReportsScreen() {
               <ul className="list" data-testid="rep-daily">
                 {[...days].reverse().map((d) => (
                   <li key={d.date} className="row">
-                    <span className="row-main">
+                    <span className="row-main" style={{ display: 'flex', flexDirection: 'column' }}>
                       <span className="row-title">{d.date}</span>
                       <span className="muted">{t('reports.bills', { count: d.bills })}{d.returnsPaise > 0 ? ` · ${t('reports.returns')} ${money(d.returnsPaise)}` : ''}</span>
                     </span>
@@ -94,7 +94,7 @@ export default function ReportsScreen() {
               <ul className="list" data-testid="rep-items">
                 {items.slice(0, ITEM_ROWS).map((i) => (
                   <li key={i.productId} className="row">
-                    <span className="row-main">
+                    <span className="row-main" style={{ display: 'flex', flexDirection: 'column' }}>
                       <span className="row-title">{i.name}</span>
                       <span className="muted">{formatQtyNumber(i.netQtyMilli)}{i.netQtyMilli > 0 ? ` · ${t('reports.avg')} ${money(i.avgPricePaise)}` : ''}</span>
                     </span>

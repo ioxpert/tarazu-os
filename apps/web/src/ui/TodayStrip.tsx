@@ -31,6 +31,7 @@ export function TodayStrip() {
         <span className="muted">
           {t('reports.bills', { count: sum.bills })}
           {pos.khataOutstandingPaise > 0 ? ` · ${t('reports.khataOwed', { amount: money(pos.khataOutstandingPaise) })}` : ''}
+          {pos.oversoldItems > 0 ? ` · ${t('reports.oversoldCount', { count: pos.oversoldItems })}` : ''}
         </span>
       </span>
     </button>

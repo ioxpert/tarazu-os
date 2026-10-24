@@ -3,7 +3,10 @@ import { OpLogWriter } from '../sync/oplog'
 import { makeSchemaDb } from '../sync/schemaDb'
 import { priceCart } from './calc'
 import { commitSale, type CommitSaleInput } from './commit'
-import { dailySales, itemSales, position, presetRange, summary } from './reports'
+import fc from 'fast-check'
+import { collectPayment } from '../khata/collect'
+import { commitPurchase } from '../purchase/commit'
+import { dailySales, dayBook, itemSales, position, presetRange, stockReport, summary } from './reports'
 import { commitReturn } from './returns'
 import { defaultProfile } from './settings'
 import { line } from './testKit'
@@ -109,5 +112,82 @@ describe('summary and position', () => {
     const p = await position(w.db)
     expect(p.khataOutstandingPaise).toBe(10000)
     expect(p.oversoldItems).toBe(2) // nothing was stocked in the fixture
+  })
+})
+
+describe('stockReport', () => {
+  it('lists oversold first, then out of stock, and counts each', async () => {
+    const w = await world()
+    const sid = IDENTITY.storeId
+    for (const [pid, qty] of [[P1, 5000], [P2, -2000]] as const) {
+      await w.db.execute(`INSERT INTO stock_balance (id, tenant_id, store_id, product_id, qty_milli, oversold, movement_count) VALUES (?, ?, ?, ?, ?, ?, 1)`, [`${sid}:${pid}`, IDENTITY.tenantId, sid, pid, qty, qty < 0 ? 1 : 0])
+    }
+    const r = await stockReport(w.db)
+    expect(r.rows.map((x) => [x.name, x.qtyMilli])).toEqual([['Soap', -2000], ['Rice', 5000]])
+    expect(r).toMatchObject({ oversold: 1, outOfStock: 0, inStock: 1 })
+  })
+
+  it('adds a product held in two stores and skips an inactive one', async () => {
+    const w = await world()
+    await w.db.execute(`UPDATE product SET active = 0 WHERE id = ?`, [P2])
+    for (const [store, pid, qty] of [['s1', P1, 1000], ['s2', P1, 0], ['s1', P2, 9000]] as const) {
+      await w.db.execute(`INSERT INTO stock_balance (id, tenant_id, store_id, product_id, qty_milli, oversold, movement_count) VALUES (?, ?, ?, ?, ?, 0, 1)`, [`${store}:${pid}`, IDENTITY.tenantId, store, pid, qty])
+    }
+    const r = await stockReport(w.db)
+    expect(r.rows).toEqual([{ productId: P1, name: 'Rice', unit: 'kg', qtyMilli: 1000 }])
+  })
+})
+
+describe('dayBook', () => {
+  it('lists each event once, in time order, and keeps bill tenders out of the collections', async () => {
+    const w = await fixture()
+    w.at(T0 + DAY + 120_000)
+    await collectPayment(w.writer, { requestId: 'c1', partyId: PARTY.id, amountPaise: 4000, mode: 'upi', identity: IDENTITY, actorUserId: null, now: T0 + DAY + 120_000 })
+    const b = await dayBook(w.db, BOTH)
+    expect(b.entries.map((e) => e.kind)).toEqual(['sale', 'sale', 'sale', 'return', 'collection'])
+    expect(b.entries.map((e) => e.at)).toEqual([...b.entries.map((e) => e.at)].sort())
+    expect(b).toMatchObject({ salesPaise: 55400, returnsPaise: 11800, collectionsPaise: 4000, takingsPaise: 47600 })
+  })
+
+  it('takings equal daily net sales plus collections, and the entries add up to the payments (property)', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.array(fc.record({ day: fc.integer({ min: 0, max: 2 }), qty: fc.integer({ min: 1, max: 5 }), mode: fc.constantFrom('cash', 'upi', 'credit'), collect: fc.integer({ min: 0, max: 5000 }) }), { minLength: 1, maxLength: 8 }),
+        async (ops) => {
+          const w = await world()
+          let collected = 0
+          for (const [n, o] of ops.entries()) {
+            const at = T0 + o.day * DAY + n * 1000
+            const total = priceCart({ lines: [{ ...soap(), qtyMilli: o.qty * 1000 }], billDiscount: null }, { gstMode: 'regular', rounding: 'nearest_rupee', onDate: '2026-10-17' }).totalPaise
+            await sell(w, at, [{ ...soap(), qtyMilli: o.qty * 1000 }], [{ mode: o.mode, amountPaise: total }], o.mode === 'credit' ? PARTY : null)
+            if (o.collect > 0) {
+              await collectPayment(w.writer, { requestId: `pc${++seq}`, partyId: PARTY.id, amountPaise: o.collect, mode: 'cash', identity: IDENTITY, actorUserId: null, now: at + 500 })
+              collected += o.collect
+            }
+          }
+          const range = { fromDate: '2026-10-17', toDate: '2026-10-19' }
+          const days = await dailySales(w.db, range)
+          const b = await dayBook(w.db, range)
+          expect(b.collectionsPaise).toBe(collected)
+          expect(b.takingsPaise).toBe(days.reduce((a, d) => a + d.netPaise, 0) + collected)
+          // every payment is either a bill tender (inside a sale row) or a collection/supplier row: nothing counted twice
+          const tendered = b.moneyInPaise - b.collectionsPaise
+          const [t] = await w.db.getAll<{ s: number | null }>(`SELECT SUM(amount_paise) AS s FROM payment WHERE invoice_id IS NOT NULL AND direction = 'in'`)
+          expect(tendered).toBe(Number(t?.s ?? 0))
+        },
+      ),
+      { numRuns: 15 },
+    )
+  })
+
+  it('shows a supplier purchase and the money paid out for it', async () => {
+    const w = await world()
+    await commitPurchase(w.writer, w.db, {
+      requestId: 'b1', supplier: null, payments: [{ mode: 'cash', amountPaise: 5000 }], identity: IDENTITY, actorUserId: null, now: T0,
+      lines: [{ productId: P1, qtyMilli: 10_000, unitCostPaise: 500 }],
+    })
+    const b = await dayBook(w.db, { fromDate: '2026-10-17', toDate: '2026-10-17' })
+    expect(b.purchasesPaise).toBe(5000)
+    expect(b.moneyOutPaise).toBe(5000)
   })
 })

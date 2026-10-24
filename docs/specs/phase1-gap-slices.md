@@ -186,5 +186,5 @@ flagged `oversold`, not rejected.
 ## Open questions
 1. Cess: apply in billing first (recommended) or report it as not collected?
 2. Backup format: raw SQLite file or a versioned op-log dump? The op-log dump is safer for future restore.
-3. Dashboard: is "profit" shown by default, or only to owner/accountant roles? Cashiers probably should not see cost.
+3. Dashboard: is "profit" shown by default, or only to owner/accountant roles? Cashiers probably should not see cost. **Decided:** the counter has no role check, so cost and profit (and stock value at cost) open behind the owner PIN, as in ADR 0008. They ship in a follow-up change; this one has no cost data.
 4. Do reports need store-level filtering now, given management permissions are tenant-wide (ADR 0004 known gap)?

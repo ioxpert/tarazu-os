@@ -63,3 +63,17 @@ describe('sync-rules.yaml matches the local read-model schema', () => {
     expect(parseRules(broken).get('shift')).toContain('extra_col')
   })
 })
+
+describe('infra/powersync/setup.sql publishes exactly the tables the sync rules read', () => {
+  const setup = readFileSync(resolve(__dirname, '../../../../infra/powersync/setup.sql'), 'utf8')
+  const published = [...(/synced text\[\] := ARRAY\[([^\]]+)\]/.exec(setup)?.[1] ?? '').matchAll(/'(\w+)'/g)].map((m) => m[1])
+
+  it('lists the same tables, so a new synced table cannot be left out of the publication', () => {
+    expect(published.length).toBeGreaterThan(0)
+    expect([...published].sort()).toEqual([...parseRules(RULES).keys()].sort())
+  })
+
+  it('never grants BYPASSRLS', () => {
+    expect(setup.replace(/--.*$/gm, '')).not.toMatch(/BYPASSRLS/i)
+  })
+})

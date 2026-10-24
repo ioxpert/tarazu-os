@@ -1,9 +1,11 @@
 # Local dev dependencies. Start: docker compose -f infra/docker-compose.yml up -d
-# PowerSync is intentionally NOT here yet: its config and sync rules come with the sync spike PR,
-# after the OPFS / multi-tab spike confirms the web SDK path (see docs/adr/0001).
+# PowerSync (sync of the read model to devices) is behind the `sync` profile because it needs a one-time database setup
+# after the API has run once: see infra/powersync/README.md or just run ./scripts/dev.sh.
+#   docker compose -f infra/docker-compose.yml --profile sync up -d powersync
 services:
   postgres:
     image: postgres:16-alpine
+    command: ["postgres", "-c", "wal_level=logical"]   # logical replication for PowerSync
     environment:
       POSTGRES_PASSWORD: postgres_dev
     ports:
@@ -16,5 +18,16 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+  powersync:
+    profiles: ["sync"]
+    image: journeyapps/powersync-service:1.27.2
+    command: ["start", "-r", "unified", "-c", "/config/powersync.local.yaml"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./powersync:/config:ro
 volumes:
   pgdata:

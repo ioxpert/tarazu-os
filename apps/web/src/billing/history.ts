@@ -67,7 +67,7 @@ interface Row {
   returned: number
 }
 
-const PAID_SQL = `COALESCE((SELECT SUM(CASE WHEN p.direction = 'in' THEN p.amount_paise ELSE -p.amount_paise END) FROM payment p WHERE p.invoice_id = i.id), 0)`
+export const PAID_SQL = `COALESCE((SELECT SUM(CASE WHEN p.direction = 'in' THEN p.amount_paise ELSE -p.amount_paise END) FROM payment p WHERE p.invoice_id = i.id), 0)`
 
 function escapeLike(s: string): string {
   return s.replace(/[\\%_]/g, (c) => `\\${c}`)

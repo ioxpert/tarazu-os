@@ -24,7 +24,8 @@
     "offline": "Offline – billing works as usual",
     "unsent_one": "{{count}} bill waiting to back up",
     "unsent_other": "{{count}} bills waiting to back up",
-    "history": "History"
+    "history": "History",
+    "reports": "Reports"
   },
   "bill": {
     "title": "New bill",
@@ -516,5 +517,28 @@
     "notConfigured": "This server cannot make pairing codes yet.",
     "failed": "Could not make a code. Try again.",
     "offline": "No internet. Connect and try again."
+  },
+  "reports": {
+    "title": "Reports",
+    "range": "Period",
+    "ranges": {
+      "today": "Today",
+      "week": "7 days",
+      "month": "This month",
+      "custom": "Pick dates"
+    },
+    "pickDates": "Pick a start and an end date.",
+    "today": "Today",
+    "net": "Sales after returns",
+    "bills_one": "{{count}} bill",
+    "bills_other": "{{count}} bills",
+    "returns": "Returns",
+    "tabs": {
+      "daily": "By day",
+      "items": "By item"
+    },
+    "avg": "avg",
+    "empty": "No sales in this period.",
+    "khataOwed": "{{amount}} owed on khata"
   }
 }

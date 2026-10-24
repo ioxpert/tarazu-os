@@ -2,7 +2,7 @@ import type { UomSpec, Unit } from './types'
 
 /** The UomUnit enum of the contract. */
 export const UNITS: readonly Unit[] = [
-  'piece', 'packet', 'strip', 'bottle', 'dozen', 'kg', 'g', 'litre', 'ml', 'bag', 'box', 'case', 'carton', 'bundle',
+  'piece', 'packet', 'strip', 'bottle', 'dozen', 'kg', 'g', 'litre', 'ml', 'bag', 'box', 'case', 'carton', 'bundle', 'quintal',
 ]
 export const MAX_UOM_UNITS = 8
 /** Largest milli-quantity of one unit we accept (1e12 = a billion base units): far below 2^53 so products stay exact. */

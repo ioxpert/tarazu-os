@@ -14,7 +14,7 @@ import { navigate, useRoute } from './router'
 import { CameraScanModal } from './scan'
 import { Icon } from './icons'
 
-const PACK_UNITS: Unit[] = ['packet', 'strip', 'bottle', 'dozen', 'bag', 'box', 'case', 'carton', 'bundle']
+const PACK_UNITS: Unit[] = ['packet', 'strip', 'bottle', 'dozen', 'bag', 'box', 'case', 'carton', 'bundle', 'quintal']
 
 /**
  * Add an item. The only required field is the name, so a new item takes seconds: name, price, Save.

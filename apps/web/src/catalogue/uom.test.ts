@@ -34,6 +34,11 @@ describe('chains', () => {
     expect(toBaseMilli(CASE_SPEC, 'packet', '2')).toBe(24000)
     expect(toBaseMilli(CASE_SPEC, 'piece', 3)).toBe(3000)
   })
+  it('sells grain by the quintal: 1 quintal = 100 kg, so 2.5 quintal is 250 kg', () => {
+    const spec = buildChain([{ unit: 'quintal', per: 100 }, { unit: 'kg' }])
+    expect(spec).toEqual({ base: 'kg', units: [{ unit: 'quintal', qtyMilli: 100000 }] })
+    expect(toBaseMilli(spec, 'quintal', '2.5')).toBe(250000)
+  })
   it('describes largest first with per-next multipliers', () => {
     expect(describeChain(CASE_SPEC).map((r) => [r.unit, r.perNext, r.inBase, r.isBase])).toEqual([
       ['case', 24, '288', false], ['packet', 12, '12', false], ['piece', null, '1', true],

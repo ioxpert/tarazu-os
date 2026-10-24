@@ -141,6 +141,16 @@ class CatalogueIT extends ApiIT {
 	}
 
 	@Test
+	void aQuintalIsAnAcceptedUnitAndKeepsItsSizeInKilos() throws Exception {
+		Seed seed = seedTenant();
+		var d = new Ops(seed);
+		UUID id = UUID.randomUUID();
+		var res = upload(seed, d.create("product", id, m("name", "Bajra", "unit", "kg", "uom", uom("kg", "quintal", 100_000))));
+		assertThat(statusOf(res, 0)).isEqualTo("applied");
+		assertThat(json.readTree((String) product(seed, id).get("uom_text")).get("units").get(0).get("unit").asString()).isEqualTo("quintal");
+	}
+
+	@Test
 	void existingRowsKeepTheirLegacyUnitText() throws Exception {
 		Seed seed = seedTenant();
 		UUID id = UUID.randomUUID();

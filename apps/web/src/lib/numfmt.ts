@@ -44,6 +44,7 @@ const UNIT_ABBR: Record<Unit, string> = {
   case: 'case',
   carton: 'ctn',
   bundle: 'bdl',
+  quintal: 'qtl',
 }
 
 /** Milli-units as a plain number text: 1500 -> '1.5', 12000 -> '12', 250 -> '0.25'. At most 3 decimals, trimmed. */

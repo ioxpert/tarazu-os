@@ -729,6 +729,25 @@ loose.push(
   L('dairy', 'Curd Dahi Loose', 'दही खुला', '0403', 'kg', 80),
 )
 
+// ------------------------------------------------------------------ Rajasthan staples (loose). APPEND-ONLY: new rows go at the END of
+// `loose` so no existing GRO-xxxx packSku moves. Indicative shop rates per kg; the merchant reviews them.
+loose.push(
+  L('atta', 'Bajra Pearl Millet Loose', 'बाजरा खुला', '1008', 'kg', 40),
+  L('atta', 'Bajra Atta Loose', 'बाजरे का आटा खुला', '1102', 'kg', 55),
+  L('atta', 'Jowar Sorghum Loose', 'ज्वार खुली', '1007', 'kg', 48),
+  L('atta', 'Makki Maize Atta Loose', 'मक्की का आटा खुला', '1102', 'kg', 50),
+  L('atta', 'Wheat Grain Gehun Loose', 'गेहूं खुला', '1001', 'kg', 32),
+  L('atta', 'Sattu Loose', 'सत्तू खुला', '1106', 'kg', 90),
+  L('dal', 'Moth Dal Loose', 'मोठ दाल खुली', '0713', 'kg', 120),
+  L('dal', 'Moth Whole Loose', 'साबुत मोठ खुला', '0713', 'kg', 110),
+  L('masala', 'Ajwain Carom Seeds Loose', 'अजवाइन खुली', '0909', 'kg', 320),
+  L('masala', 'Methi Dana Fenugreek Loose', 'मेथी दाना खुला', '0910', 'kg', 130),
+  L('masala', 'Red Chilli Whole Loose', 'साबुत लाल मिर्च खुली', '0904', 'kg', 360),
+  L('dairy', 'Desi Ghee Loose', 'देसी घी खुला', '0405', 'kg', 600, 500),
+  L('namkeen', 'Bikaneri Bhujia Loose', 'बीकानेरी भुजिया खुली', '2106', 'kg', 260, 500),
+  L('namkeen', 'Mathri Loose', 'मठरी खुली', '2106', 'kg', 240, 500),
+)
+
 // ------------------------------------------------------------------ provision store ("general"): a smaller mixed list
 // Picks from the rows above, "Exact product name:size,size" (sizes as written in the packs string; '*' keeps every pack).
 export const GENERAL_PICKS = [

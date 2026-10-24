@@ -158,3 +158,21 @@ function toCatalogueItem(s: StarterItem, n: number): CatalogueItem {
     mrpPaise: s.mrpPaise,
   })
 }
+
+describe('Rajasthan staples in the grocery pack', () => {
+  const pack = JSON.parse(readFileSync(fileOf('grocery')).toString('utf8')) as StarterPackFile
+  const named = (n: string) => pack.items.find((i) => i.name === n)
+
+  it('has the local grains, pulses, spices, ghee and namkeen sold loose by the kg', () => {
+    for (const n of ['Bajra Pearl Millet Loose', 'Bajra Atta Loose', 'Jowar Sorghum Loose', 'Sattu Loose', 'Moth Dal Loose', 'Ajwain Carom Seeds Loose', 'Desi Ghee Loose', 'Bikaneri Bhujia Loose']) {
+      const item = named(n)
+      expect(item, n).toBeDefined()
+      expect(item).toMatchObject({ loose: true, unit: 'kg' })
+    }
+  })
+
+  it('is append-only: the first and the last of the older loose items keep their SKUs', () => {
+    expect(pack.items[0]).toMatchObject({ packSku: 'GRO-0001', name: 'Aashirvaad Whole Wheat Atta 2 kg' })
+    expect(named('Curd Dahi Loose')?.packSku).toBe('GRO-0600')
+  })
+})

@@ -44,10 +44,34 @@ class PairingBudgetIT extends ApiIT {
 		for (int i = 0; i < 3; i++) {
 			redeem("AAAA-AAA" + "ABCD".charAt(i)).andExpect(status().isNotFound());
 		}
+		// input that cannot be a code never spends budget
+		redeem("nope").andExpect(status().isNotFound());
 		redeem("AAAA-AAAA").andExpect(status().isTooManyRequests()).andExpect(jsonPath("$.code").value("too_many_requests"));
 		redeem(code).andExpect(status().isTooManyRequests());
 
 		AdminSql.of(env).update("DELETE FROM otp_throttle");
 		redeem(code).andExpect(status().isCreated());
+	}
+
+	@Test
+	void aParallelBurstOfWrongGuessesCannotOvershootTheBudget() throws Exception {
+		var pool = java.util.concurrent.Executors.newFixedThreadPool(12);
+		try {
+			var results = new java.util.ArrayList<java.util.concurrent.Future<Integer>>();
+			for (int i = 0; i < 24; i++) {
+				String guess = "BBBB-BBB" + "ABCDEFGHJKLMNPQRSTUVWXYZ".charAt(i);
+				results.add(pool.submit(() -> redeem(guess).andReturn().getResponse().getStatus()));
+			}
+			int notFound = 0;
+			for (var r : results) {
+				if (r.get() == 404) {
+					notFound++;
+				}
+			}
+			org.assertj.core.api.Assertions.assertThat(notFound).as("only the budget's worth of guesses were actually tried").isEqualTo(3);
+		}
+		finally {
+			pool.shutdownNow();
+		}
 	}
 }

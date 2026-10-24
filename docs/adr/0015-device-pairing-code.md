@@ -30,8 +30,9 @@ Shopify POS pairing) use a short code the owner reads off their screen and the c
   when unset). A wrong, unknown or expired code is one answer, 404 `pairing_invalid`. Because a wrong guess maps to no row there
   is nothing per code to count, so wrong or already-used attempts are counted in a **deployment-wide** budget
   (`tarazu.pairing.max-failures` per `tarazu.pairing.window-minutes`, default 30 per 10 minutes, counted over the current and
-  previous window); when it is spent, redemption answers 429 until it clears. Failed attempts are committed even though the
-  request fails. Per-IP limiting is left to the edge (ADR 0004).
+  previous window); when it is spent, redemption answers 429 until it clears. The check, the attempt and the count run in one
+  transaction behind an advisory lock, so a parallel burst cannot overshoot the budget, and a counted failure is committed even
+  though the request fails. Input that cannot be a code (wrong length or characters) is refused without spending budget. Per-IP limiting is left to the edge (ADR 0004).
 
 ## Why this is safe enough
 An attacker needs a live code. With N codes outstanding and at most 30 guesses per window the chance per window is about

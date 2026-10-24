@@ -131,26 +131,40 @@ class PairingService {
 
 	/**
 	 * Counter side, no credential yet. A wrong, expired or unknown code is one answer (404) so codes cannot be probed, and
-	 * counts against a deployment-wide failure budget that is committed even though the request fails.
+	 * counts against a deployment-wide failure budget. The budget check, the attempt and the failure count run in ONE
+	 * transaction behind an advisory lock, so a burst of parallel guesses cannot all pass the check before any is counted.
+	 * Input that cannot be a code (wrong length or characters) maps to no row, so it is refused without touching the budget.
+	 * A counted failure is committed even though the request then fails: it is returned as a value, not thrown inside the transaction.
 	 */
 	Redeemed redeem(String rawCode, UUID deviceId, String secret) {
 		requireConfigured();
-		if (!directory.hasRoom(maxFailures, windowMinutes)) {
-			throw tooMany();
-		}
 		String code = normalise(rawCode);
-		try {
-			if (code == null) {
-				throw invalid();
-			}
-			return tx.execute(s -> redeemInTx(code, deviceId, secret));
+		if (code == null) {
+			throw invalid();
 		}
-		catch (ApiException ex) {
-			if (ex.status() == HttpStatus.NOT_FOUND || ex.status() == HttpStatus.CONFLICT) {
-				tx.executeWithoutResult(s -> directory.recordFailure(maxFailures, windowMinutes));
-			}
-			throw ex;
+		record Outcome(Redeemed ok, ApiException refused) {
 		}
+		Outcome outcome = tx.execute(s -> {
+			jdbc.sql("SELECT pg_advisory_xact_lock(hashtext('tarazu.pairing.redeem'))").query().listOfRows();
+			if (!directory.hasRoom(maxFailures, windowMinutes)) {
+				return new Outcome(null, tooMany());
+			}
+			try {
+				return new Outcome(redeemInTx(code, deviceId, secret), null);
+			}
+			catch (ApiException ex) {
+				// only refusals raised before anything is written are counted and committed; any other failure rolls back
+				if (ex.status() == HttpStatus.NOT_FOUND || ex.status() == HttpStatus.CONFLICT) {
+					directory.recordFailure(maxFailures, windowMinutes);
+					return new Outcome(null, ex);
+				}
+				throw ex;
+			}
+		});
+		if (outcome.refused() != null) {
+			throw outcome.refused();
+		}
+		return outcome.ok();
 	}
 
 	private Redeemed redeemInTx(String code, UUID deviceId, String secret) {

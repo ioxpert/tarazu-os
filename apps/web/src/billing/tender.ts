@@ -48,3 +48,19 @@ export function settleTenders(totalPaise: number, tenders: readonly Tender[], ha
   if (appliedCash > 0) payments.unshift({ mode: 'cash', amountPaise: appliedCash, reference: null })
   return { payments, creditPaise: credit, changeDuePaise: change, cashTenderedPaise: cash }
 }
+
+/**
+ * Cash amounts a customer is likely to hand over for `duePaise`, smallest first: the next 10, 50, 100 and 500 rupees
+ * above the amount due, then the next 2000 note, without repeats. Never includes the exact amount (that has its own
+ * button) and never suggests less than is due.
+ */
+export function cashSuggestions(duePaise: number): number[] {
+  if (!Number.isInteger(duePaise) || duePaise <= 0) return []
+  const out: number[] = []
+  for (const step of [1_000, 5_000, 10_000, 50_000, 200_000]) {
+    const next = Math.ceil(duePaise / step) * step
+    const amount = next === duePaise ? next + step : next
+    if (!out.includes(amount)) out.push(amount)
+  }
+  return out.slice(0, 4)
+}

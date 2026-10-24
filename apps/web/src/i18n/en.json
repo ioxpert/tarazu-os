@@ -104,7 +104,9 @@
     "change": "Give back {{amount}}",
     "needsOwnerPin": "This discount ({{percent}}%) is above your limit. The owner PIN is needed.",
     "alreadyOverLimit": "{{name}} already owes more than the limit of {{limit}}. You can still bill.",
-    "willExceedLimit": "With this, {{name}} will owe {{after}}, above the limit of {{limit}}. You can still bill."
+    "willExceedLimit": "With this, {{name}} will owe {{after}}, above the limit of {{limit}}. You can still bill.",
+    "quickCash": "Cash handed over",
+    "exact": "Exact"
   },
   "approval": {
     "explain": "Needs the owner's PIN. This is recorded.",

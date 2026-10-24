@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { priceCart } from '../billing/calc'
 import { holdBill, listHeld, discardHeld, resumeHeld, type HeldBill } from '../billing/hold'
@@ -39,6 +39,7 @@ export default function BillScreen() {
   const [looseItem, setLooseItem] = useState<CatalogueItem | null>(null)
   const [unknownCode, setUnknownCode] = useState<string | null>(null)
   const [discountOpen, setDiscountOpen] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
 
   const onDate = todayIst()
   const priced = useMemo(() => {
@@ -98,6 +99,23 @@ export default function BillScreen() {
     return popular
   }, [query, category, app.index, app.items, popular])
 
+  /** Add the tapped item and get ready for the next one: clear the search, and refocus it where there is no on-screen keyboard to pop up. */
+  const choose = (item: CatalogueItem) => {
+    void addItem(item)
+    setQuery('')
+    if (window.matchMedia('(pointer: fine)').matches) searchRef.current?.focus()
+  }
+
+  /** Enter adds a typed barcode, else the top search result. */
+  const onSearchEnter = () => {
+    const q = query.trim()
+    if (!q) return
+    if (/^\d{6,14}$/.test(q)) {
+      onScan(q)
+      setQuery('')
+    } else if (results[0]) choose(results[0])
+  }
+
   const categories = useMemo(() => listCategories(app.items, CATEGORY_TILES).filter((c) => c.count > 0), [app.items])
   const { i18n } = useTranslation()
   const catLabel = (id: string) => {
@@ -144,7 +162,7 @@ export default function BillScreen() {
           </>
         }
       />
-      <div className="screen-body bill-body">
+      <div className={`screen-body bill-body${bill.lines.length > 0 ? ' has-lines' : ''}`}>
         <section className="bill-pick" aria-label={t('bill.findItems')}>
           <div className="row" style={{ padding: 4 }}>
             <Icon name="search" />
@@ -158,6 +176,13 @@ export default function BillScreen() {
               aria-label={t('bill.searchPlaceholder')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  onSearchEnter()
+                }
+              }}
+              ref={searchRef}
               data-testid="item-search"
               autoFocus
             />
@@ -185,7 +210,7 @@ export default function BillScreen() {
             <ul className="grid-items list" style={{ display: 'grid' }} data-testid="item-results">
               {results.map((it) => (
                 <li key={it.id}>
-                  <button type="button" className="item-card" style={{ width: '100%' }} onClick={() => void addItem(it)} data-testid="item-card">
+                  <button type="button" className="item-card" style={{ width: '100%' }} onClick={() => choose(it)} data-testid="item-card">
                     <span className="row-title">{nameOf(it)}</span>
                     <span className="price">
                       {it.retailPaise ?? it.mrpPaise ? formatRupees((it.retailPaise ?? it.mrpPaise)!) : t('bill.noPrice')}

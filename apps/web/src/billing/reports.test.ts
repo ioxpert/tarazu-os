@@ -6,7 +6,7 @@ import { commitSale, type CommitSaleInput } from './commit'
 import fc from 'fast-check'
 import { collectPayment } from '../khata/collect'
 import { commitPurchase } from '../purchase/commit'
-import { dailySales, dayBook, itemSales, position, presetRange, stockReport, summary } from './reports'
+import { dailySales, dayBook, itemSales, position, presetRange, profitReport, stockReport, stockValue, summary } from './reports'
 import { commitReturn } from './returns'
 import { defaultProfile } from './settings'
 import { line } from './testKit'
@@ -189,5 +189,51 @@ describe('dayBook', () => {
     const b = await dayBook(w.db, { fromDate: '2026-10-17', toDate: '2026-10-17' })
     expect(b.purchasesPaise).toBe(5000)
     expect(b.moneyOutPaise).toBe(5000)
+  })
+})
+
+const costOf = (w: World, productId: string, unitCostPaise: number, now: number, qtyMilli = 1000) =>
+  commitPurchase(w.writer, w.db, { requestId: `cost${++seq}`, supplier: null, payments: [{ mode: 'cash', amountPaise: Math.round((qtyMilli * unitCostPaise) / 1000) }], identity: IDENTITY, actorUserId: null, now, lines: [{ productId, qtyMilli, unitCostPaise }] })
+
+describe('profitReport', () => {
+  it('uses the cost in effect on the bill, takes a return back at that cost, and leaves unknown cost out', async () => {
+    const w = await fixture()
+    // rice was bought at 50/kg the day before it sold, and the price went up to 60 afterwards: old bills keep 50
+    await costOf(w, P1, 5000, T0 - DAY)
+    await costOf(w, P1, 6000, T0 + 3 * DAY)
+    const p = await profitReport(w.db, BOTH)
+    const rice = p.items.find((i) => i.productId === P1)!
+    // sold 3 kg for 354.00 (cost 150.00), returned 1 kg for 118.00 (cost 50.00)
+    expect(rice).toMatchObject({ netQtyMilli: 2000, revenuePaise: 23600, costPaise: 10000, profitPaise: 13600, marginBp: 5763, costMissingPaise: 0 })
+    // soap never had a purchase price: its 2 x 100.00 is counted as missing, not as pure profit
+    expect(p.items.find((i) => i.productId === P2)).toMatchObject({ revenuePaise: 0, costPaise: 0, marginBp: null, costMissingPaise: 20000 })
+    expect(p).toMatchObject({ revenuePaise: 23600, costPaise: 10000, profitPaise: 13600, costMissingPaise: 20000, costMissingItems: 1 })
+    expect(p.items[0].productId).toBe(P1)
+  })
+
+  it('profit plus cost equals known revenue for any mix of costs (property)', async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.option(fc.integer({ min: 1, max: 20_000 })), fc.integer({ min: 1, max: 6 }), async (cost, qty) => {
+        const w = await world()
+        if (cost !== null) await costOf(w, P2, cost, T0 - DAY)
+        await sell(w, T0, [{ ...soap(), qtyMilli: qty * 1000 }], [{ mode: 'cash', amountPaise: 1_000_000 }])
+        const p = await profitReport(w.db, { fromDate: '2026-10-17', toDate: '2026-10-17' })
+        expect(p.profitPaise + p.costPaise).toBe(p.revenuePaise)
+        expect(p.revenuePaise + p.costMissingPaise).toBe(qty * 5000)
+        expect(p.costMissingItems).toBe(cost === null ? 1 : 0)
+      }),
+      { numRuns: 20 },
+    )
+  })
+})
+
+describe('stockValue', () => {
+  it('values stock above zero at the latest cost and counts what has no cost', async () => {
+    const w = await world()
+    await costOf(w, P1, 5000, T0, 10_000) // 10 kg bought at 50/kg: also stocks 10 kg
+    await costOf(w, P1, 6000, T0 + 1000, 0 + 1000) // +1 kg at 60/kg
+    await w.db.execute(`INSERT INTO stock_balance (id, tenant_id, store_id, product_id, qty_milli, oversold, movement_count) VALUES ('x:${P2}', ?, 'x', ?, 4000, 0, 1)`, [IDENTITY.tenantId, P2])
+    const v = await stockValue(w.db)
+    expect(v).toEqual({ valuePaise: 11 * 6000, costMissingItems: 1 })
   })
 })

@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { dailySales, dayBook, itemSales, presetRange, stockReport, summary, type DailySales, type DateRange, type DayBook, type ItemSales, type RangePreset, type StockReport, type Summary } from '../billing/reports'
+import { dailySales, dayBook, itemSales, presetRange, profitReport, stockReport, stockValue, summary, type DailySales, type DateRange, type DayBook, type ItemSales, type ProfitReport, type RangePreset, type StockReport, type StockValue, type Summary } from '../billing/reports'
 import { formatQtyNumber, formatRupees } from '../lib/numfmt'
 import { useApp } from './app'
-import { Header, Screen } from './components'
+import { Banner, Header, Screen } from './components'
+import { ApprovalModal } from './common'
 
 type Range = RangePreset | 'custom'
-type Tab = 'daily' | 'items' | 'daybook' | 'stock'
-const TABS: Tab[] = ['daily', 'items', 'daybook', 'stock']
+type Tab = 'daily' | 'items' | 'daybook' | 'stock' | 'profit'
+const TABS: Tab[] = ['daily', 'items', 'daybook', 'stock', 'profit']
 const RANGES: Range[] = ['today', 'week', 'month', 'custom']
 const ITEM_ROWS = 100
 /** 'HH:mm' in IST for a stored UTC instant. */
@@ -27,6 +28,10 @@ export default function ReportsScreen() {
   const [items, setItems] = useState<ItemSales[]>([])
   const [book, setBook] = useState<DayBook | null>(null)
   const [stock, setStock] = useState<StockReport | null>(null)
+  // Cost and profit stay behind the owner PIN. The unlock lasts until this screen closes and is never stored.
+  const [unlocked, setUnlocked] = useState(false)
+  const [asking, setAsking] = useState(false)
+  const [profit, setProfit] = useState<{ report: ProfitReport; value: StockValue } | null>(null)
 
   const dates = useMemo<DateRange | null>(() => {
     if (range !== 'custom') return presetRange(range)
@@ -48,6 +53,20 @@ export default function ReportsScreen() {
       live = false
     }
   }, [app.db, dates])
+
+  useEffect(() => {
+    if (!app.db || !dates || !unlocked) return
+    let live = true
+    void Promise.all([profitReport(app.db, dates), stockValue(app.db)]).then(([report, value]) => live && setProfit({ report, value }))
+    return () => {
+      live = false
+    }
+  }, [app.db, dates, unlocked])
+
+  const pickTab = (x: Tab) => {
+    if (x === 'profit' && !unlocked) setAsking(true)
+    setTab(x)
+  }
 
   const empty = sum !== null && sum.bills === 0 && sum.returnsPaise === 0
 
@@ -80,7 +99,7 @@ export default function ReportsScreen() {
             </section>
             <div className="chips" role="group">
               {TABS.map((x) => (
-                <button key={x} type="button" className="chip" aria-pressed={tab === x} onClick={() => setTab(x)} data-testid={`rep-tab-${x}`}>{t(`reports.tabs.${x}`)}</button>
+                <button key={x} type="button" className="chip" aria-pressed={tab === x} onClick={() => pickTab(x)} data-testid={`rep-tab-${x}`}>{t(`reports.tabs.${x}`)}</button>
               ))}
             </div>
             {empty && (tab === 'daily' || tab === 'items') && <p className="muted" data-testid="rep-empty">{t('reports.empty')}</p>}
@@ -146,9 +165,44 @@ export default function ReportsScreen() {
                 )}
               </>
             )}
+            {tab === 'profit' && !unlocked && <p className="muted" data-testid="rep-profit-locked">{t('reports.profitLocked')}</p>}
+            {tab === 'profit' && unlocked && profit && (
+              <>
+                <section className="field" data-testid="rep-profit">
+                  <div className="row"><span className="row-main">{t('reports.profit')}</span><strong className="num" data-testid="rep-profit-total">{money(profit.report.profitPaise)}</strong></div>
+                  <div className="row"><span className="row-main muted">{t('reports.margin')}</span><span className="num">{profit.report.marginBp === null ? '–' : `${(profit.report.marginBp / 100).toFixed(1)}%`}</span></div>
+                  <div className="row"><span className="row-main muted">{t('reports.revenueKnown')}</span><span className="num">{money(profit.report.revenuePaise)}</span></div>
+                  <div className="row"><span className="row-main muted">{t('reports.cost')}</span><span className="num">{money(profit.report.costPaise)}</span></div>
+                  <div className="row"><span className="row-main muted">{t('reports.stockValue')}</span><span className="num" data-testid="rep-stock-value">{money(profit.value.valuePaise)}</span></div>
+                </section>
+                {(profit.report.costMissingItems > 0 || profit.value.costMissingItems > 0) && (
+                  <Banner kind="warning">{t('reports.costMissing', { sales: profit.report.costMissingItems, stock: profit.value.costMissingItems, amount: money(profit.report.costMissingPaise) })}</Banner>
+                )}
+                <ul className="list" data-testid="rep-profit-items">
+                  {profit.report.items.slice(0, ITEM_ROWS).map((i) => (
+                    <li key={i.productId} className="row">
+                      <span className="row-main" style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span className="row-title">{i.name}</span>
+                        <span className="muted">{i.marginBp === null ? t('reports.noCost') : `${t('reports.margin')} ${(i.marginBp / 100).toFixed(1)}%`}</span>
+                      </span>
+                      <strong className="num">{money(i.profitPaise)}</strong>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </>
         )}
       </div>
+      {asking && app.db && (
+        <ApprovalModal
+          db={app.db}
+          title={t('reports.profitPin')}
+          defaultReason={t('reports.profitReason')}
+          onCancel={() => { setAsking(false); setTab('daily') }}
+          onApproved={() => { setAsking(false); setUnlocked(true) }}
+        />
+      )}
     </Screen>
   )
 }

@@ -537,7 +537,8 @@
       "daily": "By day",
       "items": "By item",
       "daybook": "Day book",
-      "stock": "Stock"
+      "stock": "Stock",
+      "profit": "Profit"
     },
     "avg": "avg",
     "empty": "No sales in this period.",
@@ -557,6 +558,16 @@
     "oversold": "Sold more than recorded",
     "outOfStock": "Out of stock",
     "oversoldCount_one": "{{count}} item sold below zero stock",
-    "oversoldCount_other": "{{count}} items sold below zero stock"
+    "oversoldCount_other": "{{count}} items sold below zero stock",
+    "profit": "Profit",
+    "margin": "Margin",
+    "revenueKnown": "Sales with known cost",
+    "cost": "Cost of goods",
+    "stockValue": "Stock value at cost",
+    "profitLocked": "Profit needs the owner PIN.",
+    "profitPin": "Owner PIN to see profit",
+    "profitReason": "View profit",
+    "noCost": "No purchase price on record",
+    "costMissing": "Left out of profit: {{sales}} sold items and {{stock}} stocked items have no purchase price ({{amount}} of sales). Enter a purchase to include them."
   }
 }

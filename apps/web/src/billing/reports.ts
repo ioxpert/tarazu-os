@@ -285,3 +285,133 @@ export async function dayBook(db: StateReader, r: DateRange): Promise<DayBook> {
   entries.sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id))
   return book
 }
+
+/**
+ * Cost and profit. These read what the shop paid, so the screen opens them only behind the owner PIN (open question 3 of
+ * docs/specs/phase1-gap-slices.md). Cost is the last purchase price (ADR 0014) IN EFFECT when the bill was made, so
+ * a later price change never rewrites an old profit. Revenue and cost are both tax-inclusive, like the margin hint.
+ * A line with no known cost is not guessed at zero: it is left out of profit and counted as "cost missing".
+ */
+const COST_AT = (pid: string, at: string) =>
+  `(SELECT v.amount_paise FROM price_version v WHERE v.product_id = ${pid} AND v.price_type = 'purchase'
+      AND (v.party_id IS NULL OR v.party_id = '') AND v.effective_from <= ${at}
+    ORDER BY v.effective_from DESC, v.hlc DESC LIMIT 1)`
+const LINE_COST = (qty: string, cost: string) => `CAST(ROUND(${qty} * ${cost} / 1000.0) AS INTEGER)`
+
+export interface ProfitItem {
+  productId: string
+  name: string
+  netQtyMilli: number
+  /** Net revenue and cost of the lines whose cost is known. */
+  revenuePaise: number
+  costPaise: number
+  profitPaise: number
+  /** Profit as a share of revenue in basis points; null when there is no known-cost revenue. */
+  marginBp: number | null
+  /** Net revenue of lines sold with no purchase price on record. */
+  costMissingPaise: number
+}
+
+export interface ProfitReport {
+  items: ProfitItem[]
+  revenuePaise: number
+  costPaise: number
+  profitPaise: number
+  marginBp: number | null
+  costMissingPaise: number
+  /** Items with revenue but no known cost. */
+  costMissingItems: number
+}
+
+interface SideRow {
+  pid: string
+  qty: number
+  known_rev: number | null
+  cost: number | null
+  missing_rev: number | null
+}
+
+/** Best profit first. Returns take back revenue and cost, both at the cost in effect on the original bill. */
+export async function profitReport(db: StateReader, r: DateRange): Promise<ProfitReport> {
+  const range = [r.fromDate, r.toDate]
+  const agg = `pid, SUM(q) AS qty, SUM(CASE WHEN c IS NOT NULL THEN rev END) AS known_rev,
+               SUM(CASE WHEN c IS NOT NULL THEN ${LINE_COST('q', 'c')} END) AS cost,
+               SUM(CASE WHEN c IS NULL THEN rev END) AS missing_rev`
+  const sold = await db.getAll<SideRow>(
+    `SELECT ${agg} FROM (
+       SELECT l.product_id AS pid, l.qty_milli AS q, l.line_total_paise AS rev, ${COST_AT('l.product_id', 'i.created_at')} AS c
+       FROM invoice_line l JOIN invoice i ON i.id = l.invoice_id WHERE ${day('i.created_at')} BETWEEN ? AND ?
+     ) GROUP BY pid`,
+    range,
+  )
+  const back = await db.getAll<SideRow>(
+    `SELECT ${agg} FROM (
+       SELECT json_extract(j.value, '$.productId') AS pid, json_extract(j.value, '$.qtyMilli') AS q,
+              json_extract(j.value, '$.lineTotalPaise') AS rev, ${COST_AT("json_extract(j.value, '$.productId')", 'i.created_at')} AS c
+       FROM credit_note n JOIN invoice i ON i.id = n.invoice_id, json_each(n.lines) j
+       WHERE n.lines IS NOT NULL AND ${day('n.created_at')} BETWEEN ? AND ?
+     ) GROUP BY pid`,
+    range,
+  )
+  const rows = new Map<string, ProfitItem>()
+  const item = (pid: string): ProfitItem => {
+    let v = rows.get(pid)
+    if (!v) rows.set(pid, (v = { productId: pid, name: '', netQtyMilli: 0, revenuePaise: 0, costPaise: 0, profitPaise: 0, marginBp: null, costMissingPaise: 0 }))
+    return v
+  }
+  for (const [side, sign] of [[sold, 1], [back, -1]] as const) {
+    for (const s of side) {
+      const v = item(s.pid)
+      v.netQtyMilli += sign * Number(s.qty)
+      v.revenuePaise += sign * Number(s.known_rev ?? 0)
+      v.costPaise += sign * Number(s.cost ?? 0)
+      v.costMissingPaise += sign * Number(s.missing_rev ?? 0)
+    }
+  }
+  const ids = [...rows.keys()]
+  if (ids.length > 0) {
+    const names = await db.getAll<{ id: string; name: string }>(`SELECT id, name FROM product WHERE id IN (${ids.map(() => '?').join(',')})`, ids)
+    for (const p of names) rows.get(p.id)!.name = p.name
+  }
+  const items = [...rows.values()].map((v) => {
+    const profitPaise = v.revenuePaise - v.costPaise
+    return { ...v, profitPaise, marginBp: v.revenuePaise > 0 ? Math.round((profitPaise * 10_000) / v.revenuePaise) : null }
+  })
+  items.sort((a, b) => b.profitPaise - a.profitPaise || a.name.localeCompare(b.name))
+  const revenuePaise = items.reduce((a, v) => a + v.revenuePaise, 0)
+  const costPaise = items.reduce((a, v) => a + v.costPaise, 0)
+  return {
+    items,
+    revenuePaise,
+    costPaise,
+    profitPaise: revenuePaise - costPaise,
+    marginBp: revenuePaise > 0 ? Math.round(((revenuePaise - costPaise) * 10_000) / revenuePaise) : null,
+    costMissingPaise: items.reduce((a, v) => a + v.costMissingPaise, 0),
+    costMissingItems: items.filter((v) => v.costMissingPaise > 0).length,
+  }
+}
+
+export interface StockValue {
+  /** Stock on hand (above zero only) at the current last purchase cost. */
+  valuePaise: number
+  /** In-stock items with no purchase price on record; not valued. */
+  costMissingItems: number
+}
+
+export async function stockValue(db: StateReader): Promise<StockValue> {
+  const rows = await db.getAll<{ qty: number; c: number | null }>(
+    `SELECT SUM(b.qty_milli) AS qty,
+            (SELECT v.amount_paise FROM price_version v WHERE v.product_id = b.product_id AND v.price_type = 'purchase'
+               AND (v.party_id IS NULL OR v.party_id = '') ORDER BY v.effective_from DESC, v.hlc DESC LIMIT 1) AS c
+     FROM stock_balance b LEFT JOIN product p ON p.id = b.product_id WHERE COALESCE(p.active, 1) = 1 GROUP BY b.product_id`,
+  )
+  let valuePaise = 0
+  let costMissingItems = 0
+  for (const r of rows) {
+    const qty = Number(r.qty)
+    if (qty <= 0) continue
+    if (r.c === null) costMissingItems++
+    else valuePaise += Math.round((qty * Number(r.c)) / 1000)
+  }
+  return { valuePaise, costMissingItems }
+}

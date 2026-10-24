@@ -535,11 +535,28 @@
     "returns": "Returns",
     "tabs": {
       "daily": "By day",
-      "items": "By item"
+      "items": "By item",
+      "daybook": "Day book",
+      "stock": "Stock"
     },
     "avg": "avg",
     "empty": "No sales in this period.",
     "khataOwed": "{{amount}} owed on khata",
-    "sales": "Sales"
+    "sales": "Sales",
+    "takings": "Sales after returns + collections",
+    "dayBookEmpty": "Nothing happened in this period.",
+    "kind": {
+      "sale": "Sale",
+      "return": "Return",
+      "collection": "Customer paid",
+      "supplier_payment": "Paid supplier",
+      "purchase": "Stock bought"
+    },
+    "stockSummary": "{{oversold}} sold below zero · {{out}} out of stock · {{inStock}} in stock",
+    "stockEmpty": "No stock recorded yet.",
+    "oversold": "Sold more than recorded",
+    "outOfStock": "Out of stock",
+    "oversoldCount_one": "{{count}} item sold below zero stock",
+    "oversoldCount_other": "{{count}} items sold below zero stock"
   }
 }

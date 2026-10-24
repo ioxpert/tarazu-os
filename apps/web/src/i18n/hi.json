@@ -535,11 +535,28 @@
     "returns": "वापसी",
     "tabs": {
       "daily": "दिन के हिसाब से",
-      "items": "सामान के हिसाब से"
+      "items": "सामान के हिसाब से",
+      "daybook": "रोज़नामचा",
+      "stock": "स्टॉक"
     },
     "avg": "औसत",
     "empty": "इस अवधि में कोई बिक्री नहीं।",
     "khataOwed": "खाते में {{amount}} बाकी",
-    "sales": "बिक्री"
+    "sales": "बिक्री",
+    "takings": "रिटर्न के बाद बिक्री + वसूली",
+    "dayBookEmpty": "इस अवधि में कुछ नहीं हुआ।",
+    "kind": {
+      "sale": "बिक्री",
+      "return": "वापसी",
+      "collection": "ग्राहक ने चुकाया",
+      "supplier_payment": "सप्लायर को चुकाया",
+      "purchase": "माल खरीदा"
+    },
+    "stockSummary": "{{oversold}} शून्य से नीचे बिके · {{out}} खत्म · {{inStock}} स्टॉक में",
+    "stockEmpty": "अभी कोई स्टॉक दर्ज नहीं है।",
+    "oversold": "दर्ज से ज़्यादा बिका",
+    "outOfStock": "स्टॉक खत्म",
+    "oversoldCount_one": "{{count}} सामान स्टॉक से ज़्यादा बिका",
+    "oversoldCount_other": "{{count}} सामान स्टॉक से ज़्यादा बिके"
   }
 }

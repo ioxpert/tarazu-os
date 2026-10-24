@@ -177,6 +177,7 @@ export function buildReceiptLayout(data: ReceiptData, opts: ReceiptOptions): Rec
   if (data.docType === 'bill_of_supply') {
     for (const t of labelLines('compositionNote', lang)) blocks.push(...textRows('note', t, cols, 'center'))
   }
+  if (data.duplicate) blocks.push(...textRows('note', L('duplicateCopy'), cols, 'center', true))
   rule()
   blocks.push(...kv('kv', L('billNo'), data.label, cols))
   blocks.push(...kv('kv', L('date'), formatIst(data.issuedAtIso), cols))

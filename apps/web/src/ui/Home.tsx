@@ -42,6 +42,7 @@ export default function HomeScreen() {
         <BigTile icon="stock" label={t('home.stock')} onClick={() => navigate('/stock')} testId="home-stock" />
       </div>
       <div className="screen-footer" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
+        <Button variant="ghost" onClick={() => navigate('/history')} data-testid="home-history">{t('home.history')}</Button>
         <Button variant="ghost" onClick={() => navigate('/returns')} data-testid="home-returns">{t('home.returns')}</Button>
         <Button variant="ghost" onClick={() => navigate('/shift')} data-testid="home-shift">{t('home.shift')}</Button>
         <Button variant="ghost" icon="gear" onClick={() => navigate('/settings')} data-testid="home-settings">{t('home.settings')}</Button>

@@ -23,7 +23,8 @@
     "online": "इंटरनेट चालू",
     "offline": "इंटरनेट बंद – बिलिंग चालू है",
     "unsent_one": "{{count}} बिल बैकअप के लिए रुका है",
-    "unsent_other": "{{count}} बिल बैकअप के लिए रुके हैं"
+    "unsent_other": "{{count}} बिल बैकअप के लिए रुके हैं",
+    "history": "पुराने बिल"
   },
   "bill": {
     "title": "नया बिल",
@@ -450,5 +451,44 @@
       "bought": "ख़रीदा",
       "paid": "आपने दिए"
     }
+  },
+  "history": {
+    "title": "बिल का इतिहास",
+    "search": "बिल नंबर या ग्राहक",
+    "dateFilter": "तारीख",
+    "modeFilter": "भुगतान का तरीका",
+    "typeFilter": "प्रकार",
+    "from": "शुरू की तारीख",
+    "to": "अंतिम तारीख",
+    "range": {
+      "today": "आज",
+      "yesterday": "कल",
+      "week": "7 दिन",
+      "all": "सभी",
+      "custom": "तारीख चुनें"
+    },
+    "mode": {
+      "all": "कोई भी",
+      "cash": "नकद",
+      "upi": "UPI",
+      "card": "कार्ड",
+      "credit": "खाता"
+    },
+    "type": {
+      "all": "सभी",
+      "tax_invoice": "कर चालान",
+      "bill_of_supply": "आपूर्ति बिल",
+      "retail_invoice": "खुदरा चालान",
+      "credit_note": "वापसी"
+    },
+    "empty": "कोई बिल नहीं मिला",
+    "walkIn": "वॉक-इन",
+    "creditNote": "वापसी",
+    "returned": "वापस हुआ",
+    "more": "और दिखाएँ",
+    "notFound": "यह बिल अभी इस डिवाइस पर नहीं है।",
+    "printed": "डुप्लीकेट प्रति छप गई",
+    "startReturn": "सामान वापस करें",
+    "noteLine": "वापसी {{label}}: {{amount}} ({{reason}})"
   }
 }

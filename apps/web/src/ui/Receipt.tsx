@@ -115,7 +115,7 @@ export default function ReceiptScreen() {
   )
 }
 
-function ShareModal({ stored, printer, onClose }: { stored: StoredReceipt; printer: PrinterSettings; onClose: () => void }) {
+export function ShareModal({ stored, printer, onClose }: { stored: StoredReceipt; printer: PrinterSettings; onClose: () => void }) {
   const { t } = useTranslation()
   const app = useApp()
   const [phone, setPhone] = useState('')

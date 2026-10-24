@@ -10,7 +10,7 @@ export const LABEL_KEYS = [
   'taxInvoice', 'billOfSupply', 'retailInvoice', 'creditNote', 'item', 'qty', 'rate', 'amount', 'discount', 'subtotal',
   'total', 'roundOff', 'cgst', 'sgst', 'tax', 'taxable', 'gst', 'paid', 'change', 'customerOwes', 'upi', 'cash', 'card',
   'credit', 'thankYou', 'visitAgain', 'gstin', 'scanToPay', 'billNo', 'date', 'customer', 'cashier', 'against', 'refund',
-  'khataAdjusted', 'compositionNote', 'phone', 'ref', 'youSaved',
+  'khataAdjusted', 'compositionNote', 'phone', 'ref', 'youSaved', 'duplicateCopy',
 ] as const
 export type LabelKey = (typeof LABEL_KEYS)[number]
 
@@ -60,6 +60,7 @@ export const LABELS: Record<LabelKey, Row> = {
   phone: r('Ph', 'फ़ोन'),
   ref: r('Ref', 'संदर्भ'),
   youSaved: r('You saved', 'आपकी बचत'),
+  duplicateCopy: r('DUPLICATE COPY', 'डुप्लीकेट प्रति'),
 }
 
 /** Text in one concrete language, falling back to English when that language's cell is empty. */
